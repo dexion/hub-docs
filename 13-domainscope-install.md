@@ -1,0 +1,236 @@
+# 13. Установка DomainScope
+
+DomainScope ставится отдельно от Hub. Поставка — готовый Docker-образ. Сборка из исходников не предполагается.
+
+Два основных способа: **Docker Compose** (рекомендуется для standalone) и **Kubernetes** (как часть umbrella-чарта Hub).
+
+## Способ 1: Docker Compose
+
+### Предусловия
+
+- Docker Engine 24+, Docker Compose v2.20+
+- 4 vCPU / 8 GB RAM минимум (с OpenVAS: 6+12)
+- 50 GB disk (Nuclei templates, OpenVAS feeds, БД)
+- Доступ к Docker registry с образом DomainScope
+- Outbound HTTPS (для nuclei-templates и upload в Hub)
+
+### 1. Артефакты поставки
+
+Получите от поставщика:
+
+| Файл                 | Назначение                                   |
+| -------------------- | -------------------------------------------- |
+| `docker-compose.yml` | Compose-стек со ссылкой на образ DomainScope |
+| `.env.example`       | Шаблон конфигурации                          |
+
+Положите в рабочую директорию:
+
+```bash
+sudo mkdir -p /opt/domainscope
+sudo cp docker-compose.yml .env.example /opt/domainscope/
+cd /opt/domainscope
+```
+
+### 2. Создать `.env`
+
+```bash
+cp .env.example .env
+```
+
+Минимальный набор:
+
+```ini
+# === DomainScope core ===
+DOMAINSCOPE_DOMAINS=example.com,subsidiary.com
+DOMAINSCOPE_DSN=host=postgresql user=postgres password=<strong-password> dbname=domainscope port=5432 sslmode=disable
+
+# === Hub integration ===
+DOMAINSCOPE_HUB_API_ENDPOINT=https://hub.example.com
+DOMAINSCOPE_HUB_API_TOKEN=<api-key из Hub Service Account>
+DOMAINSCOPE_HUB_PROJECT_IDS=<project-uuid>
+
+# === SARIF upload ===
+DOMAINSCOPE_SARIF_ENABLED=true
+DOMAINSCOPE_SARIF_AUTO_UPLOAD=true
+DOMAINSCOPE_SARIF_PRODUCT_ID=<product-uuid>
+DOMAINSCOPE_SARIF_API_ENDPOINT=https://hub.example.com/api/v1
+DOMAINSCOPE_SARIF_API_TOKEN=<тот же api-key или отдельный>
+DOMAINSCOPE_SARIF_SCANNER_NAME=domain-scope
+DOMAINSCOPE_SARIF_SCANNER_NODE=domain-scope-prod-01
+
+# === Опц. фильтры ===
+DOMAINSCOPE_SARIF_IP_SCOPE=public      # all / public / private
+
+# === Postgres password ===
+POSTGRES_PASSWORD=<strong-password>
+```
+
+> **Service Account в Hub**: до старта DomainScope создайте Service Account в Hub (см. [`11-integration-sarif.md`](11-integration-sarif.md)) с permission на нужный project/product. Скопируйте API key — это `DOMAINSCOPE_HUB_API_TOKEN`.
+
+### 3. Запуск
+
+```bash
+docker compose pull
+docker compose up -d
+```
+
+Стек поднимает:
+
+- `nuclei-templates-init` (one-shot, инициализирует templates в volume)
+- `postgresql` (БД)
+- `domain-scope` (daemon, Docker Hub: `dexionius/domain-scope:latest`)
+
+Проверка:
+
+```bash
+docker compose ps
+docker compose logs -f domain-scope
+```
+
+После старта в логах:
+
+```
+INFO Starting discovery cycle (loop=21600s)
+INFO Subfinder found N new subdomains for example.com
+INFO Resolving DNS for N domains
+INFO Starting port scan cycle
+INFO SARIF uploaded to https://hub.example.com (results=N)
+```
+
+### 4. Health-check
+
+```bash
+curl http://127.0.0.1:8089/health
+curl http://127.0.0.1:8089/ready
+```
+
+## Способ 2: Kubernetes
+
+DomainScope включён в umbrella-чарт `hub-platform` (см. [`04-deploy-kubernetes.md`](04-deploy-kubernetes.md)).
+
+В `values.yaml`:
+
+```yaml
+domainscope:
+  enabled: true
+  image:
+    tag: latest
+
+  env:
+    DOMAINSCOPE_DOMAINS: "example.com,subsidiary.com"
+    DOMAINSCOPE_HUB_API_ENDPOINT: "http://hub-security-scan-hub-backend:8082"
+
+  postgres:
+    enabled: true
+    storage: 30Gi
+
+  scanners:
+    nuclei:
+      enabled: true
+    openvas:
+      enabled: false # требует отдельный openvas chart
+    tlsx:
+      enabled: true
+    zap:
+      enabled: false # требует отдельный owasp-zap chart
+
+  secrets:
+    existingSecretName: domainscope-secrets
+```
+
+Секрет:
+
+```bash
+kubectl -n hub create secret generic domainscope-secrets \
+  --from-literal=postgresPassword='<strong-random>' \
+  --from-literal=hubApiToken='<token from Hub SA>' \
+  --from-literal=netboxApiToken='<если NetBox sync>'
+```
+
+## Связанные сервисы
+
+### OpenVAS
+
+Если включён `DOMAINSCOPE_OPENVAS_ENABLED=true`, нужен внешний OpenVAS cluster. В рамках Kubernetes-поставки доступен subchart `openvas`. Поднимется gvmd/gsad/ospd/redis с собственным feed-init job.
+
+DomainScope подключается:
+
+```ini
+DOMAINSCOPE_OPENVAS_HOST=openvas-gvmd
+DOMAINSCOPE_OPENVAS_PORT=9390
+DOMAINSCOPE_OPENVAS_USERNAME=admin
+DOMAINSCOPE_OPENVAS_PASSWORD=<из секрета>
+```
+
+### OWASP ZAP
+
+Subchart `owasp-zap`. DomainScope подключается:
+
+```ini
+DOMAINSCOPE_ZAP_ENABLED=true
+DOMAINSCOPE_ZAP_INSTANCES=http://zap-1:8080,http://zap-2:8080
+DOMAINSCOPE_ZAP_API_KEY=<из секрета>
+```
+
+### NetBox
+
+См. [`15-domainscope-netbox.md`](15-domainscope-netbox.md). Включается:
+
+```ini
+DOMAINSCOPE_NETBOX_ENABLED=true
+DOMAINSCOPE_NETBOX_API_ENDPOINT=https://netbox.example.com
+DOMAINSCOPE_NETBOX_API_TOKEN=<token>
+```
+
+## Проверка после установки
+
+```bash
+# Версия
+docker compose exec domain-scope domain-scope --version
+
+# Health
+curl http://localhost:8089/health
+curl http://localhost:8089/ready
+
+# Логи (события по циклам)
+docker compose logs domain-scope | tail -100
+
+# БД заполняется
+docker compose exec postgresql psql -U postgres -d domainscope -c "SELECT COUNT(*) FROM domains;"
+docker compose exec postgresql psql -U postgres -d domainscope -c "SELECT COUNT(*) FROM port_scans;"
+
+# В Hub приходят отчёты
+# Hub UI → Project → Reports — должен появиться новый report через ~5-15 мин после первого цикла
+```
+
+## Обновление
+
+```bash
+cd /opt/domainscope
+docker compose pull
+docker compose up -d
+```
+
+Все образы — `:latest`, новая версия подтягивается автоматически.
+
+## Backup
+
+```bash
+# БД
+docker compose exec postgresql pg_dump -U postgres domainscope | gzip > ds-backup-$(date +%Y%m%d).sql.gz
+```
+
+Nuclei templates обычно бэкапить не нужно — пересоздаются автоматически.
+
+## Удаление
+
+```bash
+docker compose down -v          # с томами!
+sudo rm -rf /opt/domainscope
+```
+
+## Связанные документы
+
+- [`14-domainscope-scanners.md`](14-domainscope-scanners.md) — управление сканерами
+- [`15-domainscope-netbox.md`](15-domainscope-netbox.md) — NetBox sync
+- [`16-domainscope-trails.md`](16-domainscope-trails.md) — discovery trails
