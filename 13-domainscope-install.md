@@ -229,8 +229,40 @@ docker compose down -v          # с томами!
 sudo rm -rf /opt/domainscope
 ```
 
+## Manual rescan webhook (опционально)
+
+Если на Hub'e включена функция [«Перепроверить»](20-manual-rescan.md), DomainScope может принимать webhook'и от Hub'a и запускать ре-скан по запросу оператора. Без `RESCAN_API_KEY` в окружении этот сервер не стартует.
+
+Переменные окружения DomainScope:
+
+| Переменная                    | Default | Описание                                                                                |
+| ----------------------------- | ------- | --------------------------------------------------------------------------------------- |
+| `RESCAN_API_KEY`              | —       | shared secret; **должен совпадать** с `DOMAINSCOPE_RESCAN_API_KEY` на Hub'е. Без него HTTP-сервер не стартует. |
+| `RESCAN_LISTEN_ADDR`          | `:8087` | bind-адрес HTTP-сервера                                                                  |
+| `RESCAN_EXPECTED_PROJECT_ID`  | —       | (опционально) UUID проекта в Hub'е. Если задан, webhook принимает только этот project_id. |
+
+Compose-фрагмент:
+
+```yaml
+services:
+  domainscope:
+    environment:
+      RESCAN_API_KEY: <тот же ключ, что на Hub>
+      RESCAN_LISTEN_ADDR: ":8087"
+    ports:
+      - "8087:8087"
+```
+
+После запуска проверить, что сервер поднялся:
+
+```bash
+curl http://localhost:8087/healthz
+# {"status":"ok"}
+```
+
 ## Связанные документы
 
 - [`14-domainscope-scanners.md`](14-domainscope-scanners.md) — управление сканерами
 - [`15-domainscope-netbox.md`](15-domainscope-netbox.md) — NetBox sync
 - [`16-domainscope-trails.md`](16-domainscope-trails.md) — discovery trails
+- [`20-manual-rescan.md`](20-manual-rescan.md) — UI-кнопки «Перепроверить» и автозакрытие

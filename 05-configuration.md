@@ -123,7 +123,20 @@
 | `FEATURE_FINDING_COPY`             | bool | `false` | Копирование finding в другие проекты (v0.8+) |
 | `FEATURE_JIRA_REVERSE_SYNC`        | bool | `false` | См. Jira                                     |
 | `FEATURE_AUTO_VERIFY_FIXES`        | bool | `false` | См. Jira                                     |
+| `FEATURE_MANUAL_RESCAN`            | bool | `false` | UI-кнопки «Перепроверить» (project + finding); см. [20. Manual rescan](20-manual-rescan.md) |
 | `FEATURE_SECURITY_HUB_INTEGRATION` | bool | `false` | См. Keycloak                                 |
+
+## Manual rescan (Hub → сканер)
+
+Эти переменные нужны только при `FEATURE_MANUAL_RESCAN=true`. Указывают backend'у, куда дёргать webhook'и сканеров.
+
+| Переменная                     | Тип    | Default | Описание                                                                  |
+| ------------------------------ | ------ | ------- | ------------------------------------------------------------------------- |
+| `DOMAINSCOPE_RESCAN_URL`       | url    | —       | base URL DomainScope (без `/api/v1/rescan`), напр. `http://domainscope:8087` |
+| `DOMAINSCOPE_RESCAN_API_KEY`   | string | —       | shared secret; должен совпадать с `RESCAN_API_KEY` на DomainScope         |
+| `IAC_SCANNER_RESCAN_URL`       | url    | —       | base URL IaC-сканера, напр. `http://iac-scanner:8086`                     |
+| `IAC_SCANNER_RESCAN_API_KEY`   | string | —       | shared secret; должен совпадать с `RESCAN_API_KEY` на IaC-сканере         |
+| `RESCAN_TIMEOUT_SECONDS`       | int    | `10`    | Таймаут на HTTP-вызов webhook'а                                            |
 
 ## Background jobs (worker)
 
