@@ -1,0 +1,9 @@
+site/
+.venv/
+__pycache__/
+*.pyc
+
+# Helm
+charts/*/charts/
+charts/*/*.tgz
+*.tgz
