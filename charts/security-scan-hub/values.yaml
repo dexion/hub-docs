@@ -1,0 +1,270 @@
+## Security Scan Hub — main platform values
+##
+## Two deployment paths supported:
+##   1. Standalone helm install (default) — chart generates random passwords
+##      and stores them in <release>-security-scan-hub-secrets (kept across
+##      upgrades; survives uninstall via helm.sh/resource-policy=keep).
+##   2. Umbrella / GitOps — set secrets.existingSecretName to the name of
+##      a pre-existing Secret managed externally (umbrella chart or AVP).
+##      In that case this chart will NOT create its own Secret.
+##
+## See values-gitops.yaml for the AVP / Vault-backed override layer.
+
+kubernetesClusterDomain: cluster.local
+
+nameOverride: ""
+fullnameOverride: ""
+
+serviceAccount:
+  create: false
+  name: ""
+
+## --- Sensitive values ---
+##
+## Three-tier resolution (per key):
+##   1. operator override (a non-empty value here wins)
+##   2. existing in-cluster Secret (preserved across upgrades)
+##   3. random generation (only on first install when no override)
+##
+## Set existingSecretName to point this chart at an externally managed Secret
+## (umbrella chart, ESO, AVP). When set, chart-side generation is disabled.
+secrets:
+  create: true
+  existingSecretName: ""
+  # Override individual keys here (leave empty to auto-generate on first install)
+  dbPassword: ""
+  jwtSecret: ""
+  ## OAuth2/OIDC client secret. Бинарник хаба читает его как KEYCLOAK_CLIENT_SECRET
+  ## ВСЕГДА (даже в AUTH_MODE=LOCAL — там используется для подписи внутренних
+  ## токенов). Имя env-переменной historic, по сути это generic auth secret.
+  authClientSecret: ""
+  llmApiKey: ""
+  iacScannerApiKey: ""
+  ## Пароль локального админа (auto-генерация). Backend при старте создаёт
+  ## пользователя admin@hub.local если LOCAL_ADMIN_PASSWORD задан И в БД нет
+  ## пользователей. Переустановки/upgrade'ы не пересоздают если юзер есть.
+  localAdminPassword: ""
+
+backend:
+  replicas: 1
+  strategy:
+    type: Recreate
+  nodeSelector: {}
+  tolerations: []
+  topologySpreadConstraints: []
+  backend:
+    args: []
+    image:
+      repository: dexionius/sshub-backend
+      tag: latest
+      pullPolicy: IfNotPresent
+    resources:
+      requests:
+        cpu: "250m"
+        memory: "256Mi"
+      limits:
+        cpu: "1000m"
+        memory: "1Gi"
+    env:
+      appEnv: production
+      serverPort: "8082"
+      dbHost: ""              # auto = <fullname>-postgres
+      dbPort: "5432"
+      dbName: securityhub
+      dbUser: securityhub
+      frontendUrl: https://hub.example.com
+      ## Auth: hub supports AUTH_MODE=LOCAL (no external IDP) or SSO (Keycloak/OIDC).
+      ## Default LOCAL — set keycloakUrl/Realm/ClientId to enable SSO.
+      authMode: LOCAL
+      keycloakUrl: ""
+      keycloakPublicUrl: ""
+      keycloakRealm: ""
+      keycloakClientId: ""
+      telegramBotToken: ""
+      notificationsDryRun: "false"
+      fallbackJiraUrl: ""
+      llmBaseUrl: ""
+      llmModel: "glm-4-plus"
+      llmDryRun: "true"      # default: don't actually call LLM until configured
+      llmFalsePositiveThreshold: "0.9"
+      llmRequestTimeoutSeconds: "180"
+      llmWorkers: "0"        # backend only enqueues, worker executes
+      sandboxType: ""
+      ## STORAGE_PATH — subdir под volume /app/storage. Без него backend дефолтит
+      ## в корень volume (root-owned) и upload отчётов падает с chmod EPERM
+      ## (backend = nonroot). /app/storage/reports создаётся и владеется nonroot.
+      storagePath: "/app/storage/reports"
+      logMaxSizeMb: "50"
+      logMaxBackups: "5"
+      logMaxAgeDays: "30"
+      logCompress: "true"
+
+worker:
+  replicas: 1
+  strategy:
+    type: Recreate
+  nodeSelector: {}
+  tolerations: []
+  topologySpreadConstraints: []
+  worker:
+    args: []
+    image:
+      repository: dexionius/sshub-worker
+      tag: latest
+      pullPolicy: IfNotPresent
+    resources:
+      requests:
+        cpu: "500m"
+        memory: "512Mi"
+      limits:
+        cpu: "2000m"
+        memory: "2Gi"
+    env:
+      appEnv: production
+      dbHost: ""              # auto = <fullname>-postgres
+      dbPort: "5432"
+      dbName: securityhub
+      dbUser: securityhub
+      llmBaseUrl: ""
+      llmModel: "glm-4-plus"
+      llmDryRun: "true"
+      llmFalsePositiveThreshold: "0.9"
+      llmRequestTimeoutSeconds: "180"
+      llmWorkers: "3"
+      sandboxType: "kubernetes"
+      sandboxImage: "dexionius/sshub-sandbox-tools:latest"
+      sandboxNamespace: ""    # auto = release namespace
+      sandboxTimeoutSeconds: "120"
+      sandboxOutputLimitKb: "10"
+      sandboxWgSecretName: ""
+      sandboxWgPodIp: ""
+      dispatcherWorkers: "10"
+      telegramNotificationWorkers: "5"
+      cleanupSchedule: "0 2 * * *"
+      cleanupRetentionCompletedDays: "7"
+      cleanupRetentionFailedDays: "30"
+      cleanupRetentionPendingDays: "0"
+      cleanupDryRun: "false"
+
+frontend:
+  replicas: 1
+  nodeSelector: {}
+  tolerations: []
+  topologySpreadConstraints: []
+  frontend:
+    image:
+      repository: dexionius/sshub-frontend
+      tag: latest
+      pullPolicy: IfNotPresent
+    resources:
+      requests:
+        cpu: "50m"
+        memory: "64Mi"
+      limits:
+        cpu: "200m"
+        memory: "256Mi"
+    env:
+      apiUrl: https://hub.example.com
+      authMode: LOCAL
+      keycloakUrl: ""
+      keycloakRealm: ""
+      keycloakClientId: ""
+      netboxUrl: ""
+
+postgres:
+  image:
+    repository: postgres
+    tag: "15"
+  env:
+    postgresDb: securityhub
+    postgresUser: securityhub
+
+iacScanner:
+  ## По умолчанию ВЫКЛЮЧЕН: iac-scanner использует /api/v1/products/scan-enabled,
+  ## который требует Service Account в hub'е (с scope list_products). Создаётся
+  ## SA админом через UI после первого логина. После этого:
+  ##   helm upgrade --reuse-values \
+  ##     --set iacScanner.enabled=true \
+  ##     --set secrets.iacScannerApiKey=<sa-key>
+  enabled: false
+  image:
+    repository: dexionius/sshub-iac-scanner
+    tag: latest
+  env:
+    ## tpl-aware: при standalone install резолвится в backend этого же релиза.
+    ## При umbrella установке переопределяется на полный internal-DNS адрес.
+    vmsApiUrl: 'http://{{ include "chart.fullname" . }}-backend:8082/api/v1'
+    scanWorkers: "3"
+    scanScheduleInterval: "300s"
+    logLevel: "info"
+
+## --- Ingress ---
+##
+## className: traefik (k3s default) or nginx
+## When using nginx, install ingress-nginx chart separately.
+ingress:
+  enabled: true
+  className: traefik
+  host: hub.example.com
+  ## Class-specific knobs (nginx only)
+  proxyBodySize: "100m"
+  proxyReadTimeout: "300"
+  ## Class-specific knobs (traefik only)
+  traefikEntrypoints: "web,websecure"
+  ## Extra annotations merged after class-specific ones
+  extraAnnotations: {}
+
+## --- TLS ---
+##
+## mode:
+##   selfsigned   — cert-manager SelfSigned ClusterIssuer (default; works air-gapped)
+##   letsencrypt  — cert-manager + Let's Encrypt (requires public DNS + reachable HTTP-01)
+##   existing     — supply your own pre-created Secret via existingSecretName
+##   disabled     — HTTP only (no TLS in ingress)
+tls:
+  mode: selfsigned
+  ## Override the cert-manager ClusterIssuer name (advanced)
+  issuer: ""
+  ## Required when mode=existing
+  existingSecretName: ""
+
+pvc:
+  backendStorage:
+    size: 500Mi
+    storageClassName: local-path
+  workerStorage:
+    size: 500Mi
+    storageClassName: local-path
+  postgresData:
+    size: 10Gi
+    storageClassName: local-path
+
+## --- Default project (создаётся seed-admin Job'ом) ---
+##
+## Когда umbrella устанавливает .Values.global.defaultProject — берётся оттуда.
+## В standalone-установке используется этот блок. Для standalone должны быть
+## заполнены secrets.* поля в Secret (defaultProjectId/defaultProductId/...) —
+## это выходит за scope subchart'а, поэтому в standalone defaults enabled=false.
+defaultProject:
+  enabled: false
+
+## --- Sandbox WireGuard egress (optional) ---
+## When enabled, sandbox jobs route their traffic through a WireGuard peer.
+## Generate keys with scripts/wg/2-generate-clients.sh; see docs/wireguard.md.
+sandboxWg:
+  enabled: false
+  privateKey: ""
+  serverPublicKey: ""
+  serverEndpoint: ""
+  podIp: ""
+
+## --- Demo reseed (sshub.ru demo stand) ---
+##
+## When enabled, deploys a CronJob that periodically TRUNCATEs the DB and reseeds
+## a fresh demo dataset (scripts vendored under seed/), uploads a rich SARIF, and
+## restarts the backend so Casbin/in-memory state reloads. OFF by default — only
+## for throwaway demo environments. See values-demo.yaml for the full overlay.
+demoReseed:
+  enabled: false
+  schedule: "0 */4 * * *"   # every 4 hours
+  scale: small              # small | medium | large (passed to seed_demo.py)

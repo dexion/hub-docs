@@ -1,0 +1,64 @@
+## NetBox — IPAM/DCIM source-of-truth (deployed at /netbox sub-path).
+##
+## NOT installed by hub-platform umbrella by default. Use this chart standalone
+## or via the GitOps path when you need NetBox integration.
+
+nameOverride: ""
+fullnameOverride: ""
+
+secrets:
+  create: true
+  existingSecretName: ""
+  secretKey: ""
+  superuserPassword: ""
+  superuserApiToken: ""
+  dbPassword: ""
+  redisPassword: ""
+
+netbox:
+  image:
+    repository: netboxcommunity/netbox
+    tag: "v4.2"
+  env:
+    allowedHosts: "hub.example.com"
+    superuserName: admin
+    superuserEmail: admin@example.com
+    loginRequired: "True"
+    forceScriptName: "/netbox"
+
+postgres:
+  image:
+    repository: postgres
+    tag: "16"
+  storage:
+    size: 10Gi
+    storageClassName: local-path
+
+redis:
+  image:
+    repository: redis
+    tag: 7-alpine
+  storage:
+    size: 1Gi
+    storageClassName: local-path
+
+storage:
+  media:
+    size: 5Gi
+    storageClassName: local-path
+
+ingress:
+  enabled: true
+  className: traefik
+  host: hub.example.com
+  ## Path prefix — /netbox and /netbox/* forwarded to netbox service
+  path: /netbox(/|$)(.*)
+  proxyBodySize: "25m"
+  rewriteTarget: "/netbox/$2"
+  traefikEntrypoints: "web,websecure"
+  extraAnnotations: {}
+
+tls:
+  mode: selfsigned
+  issuer: ""
+  existingSecretName: ""

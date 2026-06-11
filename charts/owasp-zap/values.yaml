@@ -1,0 +1,86 @@
+## OWASP ZAP — long-running daemon for active web application scanning.
+##
+## Architecture:
+##   - Single replica StatefulSet (zaproxy/zap-stable image, daemon mode).
+##   - Listens on TCP 8090; clients (DomainScope) authenticate with X-ZAP-API-Key.
+##   - PVC at /home/zap/.ZAP keeps sessions, contexts, and scan policies across restarts.
+##   - Optional ingress for the human Web UI (zap2docker has no built-in UI; the
+##     ingress here exposes the API for tooling like zaproxy/zap-cli outside k8s).
+##
+## Egress:
+##   - Outbound scan traffic (ZAP attacking targets) routes via WireGuard sidecar
+##     when wireguard.enabled=true. See scripts/wg/ and docs/wireguard.md.
+
+nameOverride: ""
+fullnameOverride: ""
+
+## --- Sensitive values ---
+secrets:
+  create: true
+  existingSecretName: ""
+  ## ZAP API key. Empty = randomly generated on first install (preserved across upgrades).
+  apiKey: ""
+
+image:
+  repository: zaproxy/zap-stable
+  tag: latest
+  pullPolicy: IfNotPresent
+
+## ZAP daemon listen port (inside the container; service maps it to the same port).
+port: 8090
+
+## --- Daemon resource limits ---
+##
+## ZAP can consume gigabytes of heap during active scans. Tune to your workload.
+resources:
+  requests:
+    cpu: "500m"
+    memory: "1Gi"
+  limits:
+    cpu: "4000m"
+    memory: "4Gi"
+
+## --- Storage for sessions, contexts, scan policies ---
+storage:
+  size: 10Gi
+  storageClassName: local-path
+
+## --- Service ---
+service:
+  type: ClusterIP
+  port: 8090
+
+## --- Ingress (optional — exposes the API to external tooling) ---
+##
+## The ZAP daemon does NOT have a built-in UI. The ingress here is useful if you
+## want to point a desktop ZAP client at the cluster instance. For DomainScope
+## integration you do NOT need an ingress (it's all in-cluster).
+ingress:
+  enabled: false
+  className: traefik
+  host: zap.example.com
+  proxyBodySize: "100m"
+  proxyReadTimeout: "600"
+  traefikEntrypoints: "web,websecure"
+  extraAnnotations: {}
+
+tls:
+  mode: selfsigned
+  issuer: ""
+  existingSecretName: ""
+
+## --- WireGuard egress ---
+wireguard:
+  enabled: false
+  existingSecretName: ""
+  privateKey: ""
+  serverPublicKey: ""
+  serverEndpoint: ""
+  podIp: "10.200.0.4/32"
+  ## Cluster service + pod CIDRs that must stay on the default gateway.
+  ## Defaults match k3s; override for non-k3s clusters.
+  serviceCidr: "10.43.0.0/16"
+  podCidr: "10.42.0.0/16"
+
+## ZAP daemon JVM extras (passed via -Xmx etc. into Java options).
+jvmOpts: "-Xmx2g"

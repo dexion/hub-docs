@@ -1,0 +1,58 @@
+## values-demo.yaml — overlay for the sshub.ru public demo stand
+##
+## Apply with:
+##   helm upgrade hub charts/security-scan-hub -n hub -f charts/security-scan-hub/values-demo.yaml
+##
+## This reconciles the live demo (which was previously patched ad-hoc via kubectl)
+## back into a reproducible chart-managed state.
+##
+## SECRETS ARE NOT SET HERE. secrets.llmApiKey (GLM key) and secrets.dbPassword live
+## in the in-cluster Secret (<release>-secrets, helm.sh/resource-policy=keep — preserved
+## across upgrades). The GLM key must NEVER be committed to git.
+
+backend:
+  backend:
+    image:
+      pullPolicy: Always        # demo runs tag=latest; always pull fresh
+    env:
+      authMode: LOCAL
+      frontendUrl: https://sshub.ru
+      llmBaseUrl: https://api.z.ai/api/coding/paas/v4
+      llmModel: glm-5.1
+      llmDryRun: "false"
+      sandboxType: ""
+      storagePath: /app/storage/reports
+
+worker:
+  worker:
+    image:
+      pullPolicy: Always
+    env:
+      llmBaseUrl: https://api.z.ai/api/coding/paas/v4
+      llmModel: glm-5.1
+      llmDryRun: "false"
+      sandboxType: ""                   # DISABLE sandbox — no real network probes on demo
+      telegramNotificationWorkers: "1"  # NOT 0 (River rejects 0 workers for a queue)
+
+frontend:
+  frontend:
+    image:
+      pullPolicy: Always
+    env:
+      apiUrl: https://sshub.ru          # same-origin so local-login auth/config works (else SSO fallback)
+      authMode: LOCAL
+
+ingress:
+  host: sshub.ru
+
+demoReseed:
+  enabled: true
+  schedule: "0 */4 * * *"
+  scale: small
+
+## --- Scanners NOT part of this chart ---
+##
+## openvas / owasp-zap / domainscope are SEPARATE charts/releases. On the demo
+## environment they MUST NOT run (no real scans against public targets). Do not
+## deploy those releases here; if already installed, scale them to 0 replicas.
+## They are intentionally absent from this overlay.

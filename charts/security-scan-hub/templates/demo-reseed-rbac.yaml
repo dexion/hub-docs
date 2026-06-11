@@ -1,0 +1,42 @@
+{{- if .Values.demoReseed.enabled }}
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ include "chart.fullname" . }}-demo-reseed
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app.kubernetes.io/component: demo-reseed
+    {{- include "chart.labels" . | nindent 4 }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ include "chart.fullname" . }}-demo-reseed
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app.kubernetes.io/component: demo-reseed
+    {{- include "chart.labels" . | nindent 4 }}
+rules:
+  # Restart the backend Deployment after reseed (patch pod-template annotation)
+  # so Casbin policies / in-memory state reload against the fresh dataset.
+  - apiGroups: ["apps"]
+    resources: ["deployments"]
+    verbs: ["get", "patch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ include "chart.fullname" . }}-demo-reseed
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app.kubernetes.io/component: demo-reseed
+    {{- include "chart.labels" . | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: {{ include "chart.fullname" . }}-demo-reseed
+subjects:
+  - kind: ServiceAccount
+    name: {{ include "chart.fullname" . }}-demo-reseed
+    namespace: {{ .Release.Namespace }}
+{{- end }}

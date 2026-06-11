@@ -1,0 +1,126 @@
+{
+  "$schema": "https://json.schemastore.org/sarif-2.1.0.json",
+  "version": "2.1.0",
+  "runs": [
+    {
+      "tool": {
+        "driver": {
+          "name": "FullSARIF Demo Scanner",
+          "informationUri": "https://sshub.ru",
+          "version": "1.0.0",
+          "rules": [
+            {
+              "id": "FULL-SARIF-SQLI",
+              "name": "FullSarifSqlInjection",
+              "shortDescription": { "text": "Full SARIF demo: SQL Injection" },
+              "fullDescription": { "text": "Full SARIF demonstration rule showing code flows, fixes and taxonomies. Untrusted input reaches a SQL query without parameterization." },
+              "help": {
+                "text": "Use parameterized queries / prepared statements. Never concatenate untrusted input into SQL.",
+                "markdown": "## Full SARIF demo — SQL Injection\n\nUse **parameterized queries**. See [OWASP](https://owasp.org/)."
+              },
+              "helpUri": "https://cwe.mitre.org/data/definitions/89.html",
+              "defaultConfiguration": { "level": "error" },
+              "relationships": [
+                { "target": { "id": "89", "toolComponent": { "name": "CWE" } }, "kinds": ["superset"] }
+              ],
+              "properties": { "security-severity": "9.1", "tags": ["security", "sql", "full-sarif"] }
+            },
+            {
+              "id": "FULL-SARIF-SECRET",
+              "name": "FullSarifHardcodedSecret",
+              "shortDescription": { "text": "Full SARIF demo: Hardcoded secret" },
+              "fullDescription": { "text": "Full SARIF demonstration rule: a hardcoded credential was detected in source." },
+              "help": { "text": "Move secrets to a secret manager / environment variables." },
+              "helpUri": "https://cwe.mitre.org/data/definitions/798.html",
+              "defaultConfiguration": { "level": "warning" },
+              "relationships": [
+                { "target": { "id": "798", "toolComponent": { "name": "CWE" } }, "kinds": ["superset"] }
+              ],
+              "properties": { "security-severity": "7.5", "tags": ["security", "secret", "full-sarif"] }
+            }
+          ]
+        }
+      },
+      "taxonomies": [
+        {
+          "name": "CWE",
+          "version": "4.14",
+          "informationUri": "https://cwe.mitre.org/",
+          "organization": "MITRE",
+          "shortDescription": { "text": "Common Weakness Enumeration" },
+          "isComprehensive": false,
+          "taxa": [
+            { "id": "89", "name": "Improper Neutralization of Special Elements used in an SQL Command", "shortDescription": { "text": "SQL Injection (CWE-89)" }, "helpUri": "https://cwe.mitre.org/data/definitions/89.html" },
+            { "id": "798", "name": "Use of Hard-coded Credentials", "shortDescription": { "text": "Hardcoded Credentials (CWE-798)" }, "helpUri": "https://cwe.mitre.org/data/definitions/798.html" }
+          ]
+        }
+      ],
+      "results": [
+        {
+          "ruleId": "FULL-SARIF-SQLI",
+          "ruleIndex": 0,
+          "level": "error",
+          "message": { "text": "Full SARIF demo: SQL Injection — untrusted request parameter flows into a SQL query without parameterization." },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": { "uri": "internal/db/users.go" },
+                "region": { "startLine": 142, "startColumn": 9, "endLine": 142, "endColumn": 70, "snippet": { "text": "db.Query(\"SELECT * FROM users WHERE name = '\" + name + \"'\")" } }
+              },
+              "logicalLocations": [ { "fullyQualifiedName": "db.GetUserByName", "kind": "function" } ]
+            }
+          ],
+          "codeFlows": [
+            {
+              "threadFlows": [
+                {
+                  "locations": [
+                    { "location": { "physicalLocation": { "artifactLocation": { "uri": "internal/api/handler.go" }, "region": { "startLine": 31, "snippet": { "text": "name := c.Query(\"name\")" } } }, "message": { "text": "Untrusted input enters from request query" } } },
+                    { "location": { "physicalLocation": { "artifactLocation": { "uri": "internal/api/handler.go" }, "region": { "startLine": 48, "snippet": { "text": "user, err := db.GetUserByName(name)" } } }, "message": { "text": "Tainted value passed to data layer" } } },
+                    { "location": { "physicalLocation": { "artifactLocation": { "uri": "internal/db/users.go" }, "region": { "startLine": 142, "snippet": { "text": "db.Query(\"SELECT * FROM users WHERE name = '\" + name + \"'\")" } } }, "message": { "text": "Tainted value concatenated into SQL — sink" } } }
+                  ]
+                }
+              ]
+            }
+          ],
+          "relatedLocations": [
+            { "physicalLocation": { "artifactLocation": { "uri": "internal/api/handler.go" }, "region": { "startLine": 31 } }, "message": { "text": "Source: request parameter" } }
+          ],
+          "fixes": [
+            {
+              "description": { "text": "Use a parameterized query" },
+              "artifactChanges": [
+                {
+                  "artifactLocation": { "uri": "internal/db/users.go" },
+                  "replacements": [
+                    { "deletedRegion": { "startLine": 142, "startColumn": 9, "endLine": 142, "endColumn": 70 }, "insertedContent": { "text": "db.Query(\"SELECT * FROM users WHERE name = $1\", name)" } }
+                  ]
+                }
+              ]
+            }
+          ],
+          "taxa": [ { "id": "89", "toolComponent": { "name": "CWE" } } ],
+          "partialFingerprints": { "primaryLocationLineHash": "full-sarif-sqli-1" },
+          "properties": { "cve": "CVE-2026-0001", "tags": ["full-sarif"] }
+        },
+        {
+          "ruleId": "FULL-SARIF-SECRET",
+          "ruleIndex": 1,
+          "level": "warning",
+          "message": { "text": "Full SARIF demo: Hardcoded secret — an API token is committed in source." },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": { "uri": "config/prod.yaml" },
+                "region": { "startLine": 11, "snippet": { "text": "api_token: REDACTED_DEMO_TOKEN" } }
+              }
+            }
+          ],
+          "taxa": [ { "id": "798", "toolComponent": { "name": "CWE" } } ],
+          "partialFingerprints": { "primaryLocationLineHash": "full-sarif-secret-1" },
+          "properties": { "tags": ["full-sarif"] }
+        }
+      ]
+    }
+  ]
+}

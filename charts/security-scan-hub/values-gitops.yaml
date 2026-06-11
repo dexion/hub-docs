@@ -1,0 +1,62 @@
+## Override layer for the GitOps / ArgoCD + Vault path.
+##
+## Render with the AVP plugin:
+##   helm template <release> charts/security-scan-hub \
+##     -f charts/security-scan-hub/values.yaml \
+##     -f charts/security-scan-hub/values-gitops.yaml \
+##     | argocd-vault-plugin generate -
+##
+## When the AVP plugin processes this file, the <path:...> placeholders are
+## replaced with values pulled from Vault (kv/data/hub/prod path). The chart
+## itself does not need the placeholders rendered — secretKeyRef points at
+## the same Secret that AVP / ESO populates.
+
+secrets:
+  ## Either set existingSecretName when AVP/ESO produces the Secret directly:
+  existingSecretName: ""
+  ## …or let the chart create the Secret from these AVP-resolved values:
+  create: true
+  dbPassword: "<path:kv/data/hub/prod#dbPassword>"
+  jwtSecret: "<path:kv/data/hub/prod#jwtSecret>"
+  keycloakClientSecret: "<path:kv/data/hub/prod#keycloakClientSecret>"
+  llmApiKey: "<path:kv/data/hub/prod#llmApiKey>"
+  iacScannerApiKey: "<path:kv/data/hub/prod#iacScannerApiKey>"
+
+backend:
+  backend:
+    env:
+      authMode: SSO
+      keycloakUrl: http://keycloak.keycloak:8080/auth
+      keycloakRealm: securityhub
+      keycloakClientId: securityhub
+      llmDryRun: "false"
+
+worker:
+  worker:
+    env:
+      llmDryRun: "false"
+
+frontend:
+  frontend:
+    env:
+      authMode: SSO
+      keycloakRealm: securityhub
+      keycloakClientId: securityhub
+
+## Production-grade ingress: nginx + Let's Encrypt
+ingress:
+  className: nginx
+  proxyBodySize: "100m"
+  proxyReadTimeout: "300"
+
+tls:
+  mode: letsencrypt
+  issuer: letsencrypt-prod
+
+## Sandbox WG (kept disabled here; populated from Vault when needed)
+sandboxWg:
+  enabled: false
+  privateKey: "<path:kv/data/hub/prod#sandboxWgPrivateKey>"
+  serverPublicKey: "<path:kv/data/hub/prod#sandboxWgServerPublicKey>"
+  serverEndpoint: "<path:kv/data/hub/prod#sandboxWgServerEndpoint>"
+  podIp: "<path:kv/data/hub/prod#sandboxWgPodIp>"

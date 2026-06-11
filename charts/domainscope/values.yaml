@@ -1,0 +1,123 @@
+## DomainScope — network reconnaissance & vulnerability scanning agent.
+##
+## Calls hub backend (SARIF upload), NetBox (asset discovery), OpenVAS (CVE scan)
+## and OWASP ZAP (web app scan) over the cluster network. Outbound public traffic
+## (web pings, port scans, ZAP attacks) is routed through a WireGuard egress peer
+## when wireguard.enabled=true — see scripts/wg/ and docs/wireguard.md.
+
+kubernetesClusterDomain: cluster.local
+
+nameOverride: ""
+fullnameOverride: ""
+
+## --- Sensitive values ---
+secrets:
+  create: true
+  existingSecretName: ""
+  postgresPassword: ""
+  ## sarifApiToken: hub-issued bearer for SARIF upload. Required to push results.
+  sarifApiToken: ""
+  ## netboxApiToken: only when netboxEnabled=true.
+  netboxApiToken: ""
+  ## openvasPassword: GMP user password (must match openvas.gvmd.adminPassword).
+  openvasPassword: ""
+
+domainscope:
+  replicas: 1
+  nodeSelector: {}
+  tolerations: []
+  topologySpreadConstraints: []
+  image:
+    repository: dexionius/domain-scope
+    tag: latest
+  resources:
+    requests:
+      cpu: "500m"
+      memory: "512Mi"
+    limits:
+      cpu: "4000m"
+      memory: "4Gi"
+  env:
+    # Targets
+    domains: ""
+    ignoredDomains: ""
+    targetPorts: "21,22,25,80,110,143,389,443,445,993,995,1433,1521,3306,3389,5432,5900,6379,8080,8443,27017"
+    # SARIF upload — auto_upload requires sarifProductId which the hub backend
+    # issues only AFTER the operator creates a project in the UI. Default off;
+    # flip to "true" once you have a product_id.
+    sarifEnabled: "true"
+    sarifAutoUpload: "false"
+    sarifApiEndpoint: ""    # корень Hub БЕЗ /api/v1 (клиент дописывает /api/v1/products/<id>/reports сам); umbrella авто-деривит http://<release>-...-backend.<ns>:8082
+    sarifIpScope: "public"
+    sarifProductId: ""
+    # NetBox
+    netboxEnabled: "false"
+    netboxApiEndpoint: ""
+    # Nuclei
+    nucleiEnabled: "true"
+    nucleiConcurrency: "50"
+    nucleiTemplatesPaths: ""
+    nucleiTags: "exposure,panel,config,debug,misconfig,vuln,cve,default-login,rce"
+    # OpenVAS (set by umbrella when openvas.enabled=true)
+    openvasEnabled: "false"
+    openvasHost: ""         # auto-derived to <release>-openvas-gvmd.<ns> by umbrella
+    openvasPort: "9390"
+    openvasUsername: "admin"
+    # OWASP ZAP (set by umbrella when zap.enabled=true)
+    zapEnabled: "false"
+    zapInstancesJson: ""    # JSON array, see DomainScope docs
+    zapActiveScanPolicy: "Default Policy"
+    zapAjaxSpiderTimeout: "300"
+    zapRescanPeriod: "86400"
+    # Timing
+    timeLoop: "7200"
+    timeLoopOpenvas: "86400"
+    fingerprintTimeout: "10"
+    # Hub Scope API: domainscope забирает scope (домены для скана) из hub'а.
+    # Auto-wired umbrella'ой; в standalone установке нужно вручную:
+    #   --set domainscope.domainscope.env.hubEnabled=true
+    #   --set domainscope.domainscope.env.hubApiEndpoint=http://hub-backend:8082
+    # + Secret должен содержать hubApiToken и hubProjectId (через umbrella делает auto).
+    hubEnabled: "false"
+    hubApiEndpoint: ""
+
+postgres:
+  enabled: true
+  image:
+    repository: postgres
+    tag: "16"
+  env:
+    postgresDb: domainscope
+    postgresUser: domainscope
+  storage:
+    size: 5Gi
+    storageClassName: local-path
+
+storage:
+  storageClassName: local-path
+  logs:
+    size: 500Mi
+
+## --- WireGuard egress ---
+##
+## When enabled, pod traffic for public IPs is routed through wg0 (sidecar/init).
+## Generate keypair on the operator's machine with scripts/wg/2-generate-clients.sh.
+##
+## existingSecretName: if set (umbrella supplies a Secret with privateKey/serverPublicKey/
+## serverEndpoint/podIp), the chart will not create its own.
+wireguard:
+  enabled: false
+  existingSecretName: ""
+  privateKey: ""
+  serverPublicKey: ""
+  serverEndpoint: ""           # host:port
+  podIp: "10.200.0.2/32"
+  ## Cluster service + pod CIDRs that must NOT egress through wg0 (otherwise
+  ## intra-cluster traffic — incl. CoreDNS — would be tunneled). Defaults match
+  ## k3s; override for your CNI's actual ranges if different.
+  ## Find them with: kubectl cluster-info dump | grep -i cidr
+  serviceCidr: "10.43.0.0/16"
+  podCidr: "10.42.0.0/16"
+
+## DomainScope has no public ingress (it's an outbound-only worker), so no
+## ingress/tls block here. Communicating *with* it happens over the cluster network.

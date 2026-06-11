@@ -1,0 +1,20 @@
+## GitOps overlay — render with ArgoCD Vault Plugin (AVP).
+##
+## Merge order: values.yaml ← values-gitops.yaml. The placeholders below
+## are replaced with values pulled from Vault path kv/data/scans/prod at
+## render time.
+
+secrets:
+  create: true
+  existingSecretName: ""
+  hubToken: "<path:kv/data/scans/prod#hubToken>"
+  jiraToken: "<path:kv/data/scans/prod#jiraToken>"
+  confluenceToken: "<path:kv/data/scans/prod#confluenceToken>"
+
+config:
+  hubUrl: "<path:kv/data/scans/prod#hubUrl>"
+  hubJiraProjectId: "<path:kv/data/scans/prod#hubJiraProjectId>"
+  hubConfluenceProjectId: "<path:kv/data/scans/prod#hubConfluenceProjectId>"
+  jiraUrl: "<path:kv/data/scans/prod#jiraUrl>"
+  confluenceUrl: "<path:kv/data/scans/prod#confluenceUrl>"
+  logDestination: stdout

@@ -1,0 +1,59 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "chart.fullname" . }}-backend-storage
+  labels:
+    app.kubernetes.io/component: backend
+    {{- include "chart.labels" . | nindent 4 }}
+spec:
+  accessModes:
+  - ReadWriteOnce
+  storageClassName: {{ .Values.pvc.backendStorage.storageClassName }}
+  resources:
+    requests:
+      storage: {{ .Values.pvc.backendStorage.size | quote }}
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "chart.fullname" . }}-backend-logs
+  labels:
+    app.kubernetes.io/component: backend
+    {{- include "chart.labels" . | nindent 4 }}
+spec:
+  accessModes:
+  - ReadWriteOnce
+  storageClassName: {{ .Values.pvc.backendStorage.storageClassName }}
+  resources:
+    requests:
+      storage: {{ .Values.pvc.backendStorage.size | quote }}
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "chart.fullname" . }}-worker-logs
+  labels:
+    app.kubernetes.io/component: worker
+    {{- include "chart.labels" . | nindent 4 }}
+spec:
+  accessModes:
+  - ReadWriteOnce
+  storageClassName: {{ .Values.pvc.workerStorage.storageClassName }}
+  resources:
+    requests:
+      storage: {{ .Values.pvc.workerStorage.size | quote }}
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "chart.fullname" . }}-postgres-data
+  labels:
+    app.kubernetes.io/component: postgres
+    {{- include "chart.labels" . | nindent 4 }}
+spec:
+  accessModes:
+  - ReadWriteOnce
+  storageClassName: {{ .Values.pvc.postgresData.storageClassName }}
+  resources:
+    requests:
+      storage: {{ .Values.pvc.postgresData.size | quote }}

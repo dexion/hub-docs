@@ -1,0 +1,166 @@
+## sshub-atlassian-secrets-scanner — standalone chart values
+##
+## Two deployment paths:
+##   1. Standalone helm install — chart owns its Secret. Operator supplies the
+##      three external PATs (Hub, Jira, Confluence) via secrets.* below.
+##   2. GitOps (ArgoCD + Vault AVP) — see values-gitops.yaml; placeholders are
+##      resolved at sync time.
+##
+## State (.state.json, .upload_state.json, SARIF queue) is persisted to a
+## ReadWriteOnce PVC shared by all four CronJobs (state must be visible to
+## both scanners and the uploader).
+
+nameOverride: ""
+fullnameOverride: ""
+
+## --- ServiceAccount ---
+##
+## The scanner does NOT call the Kubernetes API. We create a dedicated SA with
+## auto-mount disabled so a compromised pod cannot use a default-SA token to
+## enumerate cluster state. Override only if your environment forces all pods
+## to a specific shared SA (e.g. PSP / OPA policies).
+serviceAccount:
+  create: true
+  name: ""
+  annotations: {}
+
+## --- Image ---
+##
+## tag is intentionally NOT "latest" by default. `latest` + IfNotPresent silently
+## pins nodes to whatever they cached first; pin a semver here and bump on
+## upgrades. Use sha-<short> tags from CI when you need exact reproducibility.
+image:
+  repository: dexionius/sshub-atlassian-secrets-scanner
+  tag: "0.1.0"
+  pullPolicy: IfNotPresent
+  pullSecrets: []
+
+## --- Secrets (3-tier resolution: operator override > existing in-cluster > "") ---
+##
+## The three tokens below are external PATs — random generation does NOT make
+## sense for them. Empty values surface a clear "required" error at template
+## time so the operator knows what to fill.
+secrets:
+  ## false → chart skips Secret creation (umbrella / external owner provides one)
+  create: true
+  ## When set, deployments reference this Secret instead of <release>-secrets.
+  existingSecretName: ""
+  ## Hub service-account API key
+  hubToken: ""
+  ## Jira Personal Access Token
+  jiraToken: ""
+  ## Confluence Personal Access Token
+  confluenceToken: ""
+
+## --- Non-sensitive configuration (delivered as plain env vars) ---
+config:
+  ## Required:
+  hubUrl: ""                      # https://hub.example.com
+  hubJiraProjectId: ""            # UUID of Hub Product holding Jira findings
+  hubConfluenceProjectId: ""      # UUID of Hub Product holding Confluence findings
+  jiraUrl: ""                     # https://jira.example.com
+  confluenceUrl: ""               # https://confluence.example.com
+  ## Optional / tunable:
+  scanFromDaysAgo: "3"            # scan window start (N days back from today, UTC)
+  scanToDaysAgo: "1"              # scan window end (1 = up to yesterday)
+  cleanupMaxAgeDays: "7"          # cleanup keeps uploaded SARIF for this many days
+  logDestination: stdout          # stdout | file | both
+  ## TZ for cron schedule interpretation. Empty = cluster default (usually UTC).
+  ## CronJob.spec.timeZone requires k8s ≥ 1.27; leave empty on older clusters
+  ## and bake offsets into the schedule string instead.
+  timeZone: ""
+
+## --- CronJob definitions ---
+##
+## Schedules below mirror the legacy bare-metal crontab (see
+## scans/cron/crontab.txt) so behaviour stays predictable when the workload
+## migrates to k3s. concurrencyPolicy: Forbid prevents two scanners from
+## clobbering each other's state.
+cronjobs:
+  jira:
+    enabled: true
+    schedule: "15 22 * * *"           # 22:15 UTC = 01:15 MSK
+    suspend: false
+    successfulJobsHistoryLimit: 1
+    failedJobsHistoryLimit: 3
+    activeDeadlineSeconds: 21600      # 6h hard kill
+    backoffLimit: 0
+    resources:
+      requests: {cpu: 100m, memory: 256Mi}
+      limits:   {cpu: "1",  memory: 512Mi}
+  confluence:
+    enabled: true
+    schedule: "0 22 * * *"            # 22:00 UTC = 01:00 MSK
+    suspend: false
+    successfulJobsHistoryLimit: 1
+    failedJobsHistoryLimit: 3
+    activeDeadlineSeconds: 21600
+    backoffLimit: 0
+    resources:
+      requests: {cpu: 100m, memory: 256Mi}
+      limits:   {cpu: "1",  memory: 512Mi}
+  upload:
+    enabled: true
+    schedule: "5 7-17 * * *"          # 07:05–17:05 UTC = 10:05–20:05 MSK, hourly
+    suspend: false
+    successfulJobsHistoryLimit: 1
+    failedJobsHistoryLimit: 3
+    activeDeadlineSeconds: 1800       # 30 minutes
+    backoffLimit: 0
+    resources:
+      requests: {cpu: 50m,  memory: 128Mi}
+      limits:   {cpu: 500m, memory: 256Mi}
+  cleanup:
+    enabled: true
+    schedule: "0 3 * * *"             # 03:00 UTC = 06:00 MSK
+    suspend: false
+    successfulJobsHistoryLimit: 1
+    failedJobsHistoryLimit: 3
+    activeDeadlineSeconds: 600
+    backoffLimit: 0
+    resources:
+      requests: {cpu: 50m,  memory: 64Mi}
+      limits:   {cpu: 200m, memory: 128Mi}
+
+## --- Persistence ---
+##
+## ReadWriteOnce is enough for k3s + local-path. If multi-node scheduling
+## becomes relevant later, switch to RWX (NFS / longhorn) and review the lock
+## semantics in scan_jira.acquire_lock().
+pvc:
+  results:
+    size: 5Gi
+    storageClassName: local-path
+    accessModes: [ReadWriteOnce]
+  logs:
+    ## Only created when config.logDestination is "file" or "both".
+    enabled: false
+    size: 1Gi
+    storageClassName: local-path
+    accessModes: [ReadWriteOnce]
+
+## --- Pod-level security context ---
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 10001
+  runAsGroup: 10001
+  fsGroup: 10001
+  seccompProfile:
+    type: RuntimeDefault
+
+containerSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 10001
+  runAsGroup: 10001
+  readOnlyRootFilesystem: true
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop: ["ALL"]
+
+## --- Scheduling knobs (forwarded to all four CronJobs) ---
+nodeSelector: {}
+tolerations: []
+affinity: {}
+
+## --- Extra env (key/value) merged into every CronJob container ---
+extraEnv: {}
