@@ -14,9 +14,23 @@
 
 ## Быстрый старт
 
+### Локально через Docker Compose (ознакомление)
+
 ```bash
 git clone https://github.com/dexion/hub-docs.git
 cd hub-docs
+cp .env.example .env
+docker compose up -d            # стек + одноразовый bootstrap (admin, проект, продукт, SA)
+docker compose restart backend  # backend применит роль администратора
+```
+
+Откройте http://localhost:3000 — вход `admin@hub.local` / значение
+`LOCAL_ADMIN_PASSWORD` из `.env`. Аутентификация локальная (логин/пароль),
+Keycloak не требуется.
+
+### На k3s через Helm (полноценный стенд)
+
+```bash
 ./install.sh        # интерактивная установка на k3s
 ```
 

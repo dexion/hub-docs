@@ -7,3 +7,6 @@ __pycache__/
 charts/*/charts/
 charts/*/*.tgz
 *.tgz
+
+# Local env
+.env
