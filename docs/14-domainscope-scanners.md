@@ -200,7 +200,7 @@ DomainScope round-robin'ит scan'ы между ZAP-instances. Каждый inst
 - Exclude URLs (например, `/logout`)
 - Active scan policy (Aggressive / Default / Light)
 
-См. [`../../../domainscope/docker/zap-config/`](../../../domainscope/docker/zap-config/).
+Конфигурация лежит в каталоге `docker/zap-config/` репозитория DomainScope.
 
 **Override:**
 

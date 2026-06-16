@@ -1,0 +1,84 @@
+site_name: Security Hub — Administrator Guide
+site_description: Развёртывание, настройка и эксплуатация Security Hub и DomainScope
+site_author: hub_infosec
+docs_dir: docs
+repo_url: https://github.com/dexion/hub-docs
+repo_name: dexion/hub-docs
+edit_uri: edit/main/docs/
+
+theme:
+  name: material
+  language: ru
+  features:
+    - navigation.sections
+    - navigation.top
+    - navigation.tracking
+    - navigation.indexes
+    - toc.follow
+    - search.suggest
+    - search.highlight
+    - content.code.copy
+    - content.action.edit
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/weather-night
+        name: Тёмная тема
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/weather-sunny
+        name: Светлая тема
+
+# Только базовые расширения. Контент — чистый CommonMark, чтобы переезд на
+# другой генератор (Docusaurus и т.п.) оставался тривиальным: исходники .md
+# не зависят от Material-специфики.
+markdown_extensions:
+  - admonition
+  - toc:
+      permalink: true
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.superfences
+  - tables
+  - attr_list
+
+plugins:
+  - search:
+      lang:
+        - ru
+        - en
+
+nav:
+  - Главная: index.md
+  - Введение:
+      - Обзор архитектуры: 01-overview.md
+      - Системные требования: 02-prerequisites.md
+  - Развёртывание:
+      - Docker Compose: 03-deploy-compose.md
+      - Kubernetes / Helm: 04-deploy-kubernetes.md
+  - Конфигурация:
+      - Переменные окружения: 05-configuration.md
+  - Интеграции:
+      - Keycloak / SSO: 06-integration-keycloak.md
+      - Jira: 07-integration-jira.md
+      - Mattermost и Telegram: 08-integration-notifications.md
+      - NetBox: 09-integration-netbox.md
+      - LLM + Sandbox: 10-integration-llm-sandbox.md
+      - SARIF upload: 11-integration-sarif.md
+  - DomainScope:
+      - Обзор: 12-domainscope-overview.md
+      - Установка: 13-domainscope-install.md
+      - Управление сканерами: 14-domainscope-scanners.md
+      - NetBox sync: 15-domainscope-netbox.md
+      - Discovery trails: 16-domainscope-trails.md
+  - Операции:
+      - Эксплуатация: 17-operations.md
+      - Обновления и версионирование: 18-upgrades.md
+      - Troubleshooting: 19-troubleshooting.md
+      - Manual rescan: 20-manual-rescan.md
