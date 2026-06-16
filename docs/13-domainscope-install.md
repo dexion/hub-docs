@@ -53,7 +53,9 @@ DOMAINSCOPE_HUB_PROJECT_IDS=<project-uuid>
 DOMAINSCOPE_SARIF_ENABLED=true
 DOMAINSCOPE_SARIF_AUTO_UPLOAD=true
 DOMAINSCOPE_SARIF_PRODUCT_ID=<product-uuid>
-DOMAINSCOPE_SARIF_API_ENDPOINT=https://hub.example.com/api/v1
+# Корень Hub БЕЗ /api/v1 — DomainScope сам дописывает /api/v1/products/<id>/reports.
+# С хвостом /api/v1 путь удвоится → 404 и находки НЕ доедут в Hub.
+DOMAINSCOPE_SARIF_API_ENDPOINT=https://hub.example.com
 DOMAINSCOPE_SARIF_API_TOKEN=<тот же api-key или отдельный>
 DOMAINSCOPE_SARIF_SCANNER_NAME=domain-scope
 DOMAINSCOPE_SARIF_SCANNER_NODE=domain-scope-prod-01

@@ -161,6 +161,37 @@ docker compose logs worker | grep -i notif
 
 ## SARIF Upload
 
+### Сканер работает, но находки НЕ появляются в Hub (`404 page not found` при upload)
+
+Симптом в логах DomainScope (или другого сканера):
+
+```
+zap sarif upload failed — находки НЕ доставлены в Hub  error="404 — маршрут или продукт не найден ..."
+```
+
+Сканер находит уязвимости, но загрузка SARIF возвращает **404**. `page not found` — это
+ответ Hub на **несматченный маршрут**, почти всегда это misconfig, а НЕ отсутствие ресурса:
+
+1. **`*_SARIF_API_ENDPOINT` содержит `/api/v1`.** Endpoint должен быть **корнем Hub**
+   (`https://hub.example.com`), клиент сам дописывает `/api/v1/products/<id>/reports`.
+   С хвостом `/api/v1` путь удваивается → 404. *(В версиях DomainScope ≥ 0.24 клиент
+   стрипает хвостовой `/api/v1` сам, но привести endpoint к корню — правильно.)*
+2. **`*_SARIF_PRODUCT_ID` пустой или указывает на несуществующий в Hub продукт.**
+   В Helm проверьте, что `sarifProductId` зарезолвился (umbrella прокидывает UUID
+   default-продукта через secret). Пустой product_id раньше молча схлопывал URL.
+
+Проверка из пода сканера:
+
+```bash
+# Должно вернуть 202/4xx с JSON, а НЕ "404 page not found":
+curl -s -o /dev/null -w '%{http_code}\n' -X POST \
+  -H "X-API-Key: $DOMAINSCOPE_SARIF_API_TOKEN" -F file=@/dev/null \
+  "$DOMAINSCOPE_SARIF_API_ENDPOINT/api/v1/products/$DOMAINSCOPE_SARIF_PRODUCT_ID/reports"
+```
+
+Стартовый лог сканера (`sarif upload configured`) печатает `api_endpoint`,
+`product_id_set`, `auto_upload` — сверьте их сразу после старта.
+
 ### `413 Payload Too Large`
 
 ```nginx
