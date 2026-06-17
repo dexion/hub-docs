@@ -174,8 +174,10 @@ zap sarif upload failed — находки НЕ доставлены в Hub  err
 
 1. **`*_SARIF_API_ENDPOINT` содержит `/api/v1`.** Endpoint должен быть **корнем Hub**
    (`https://hub.example.com`), клиент сам дописывает `/api/v1/products/<id>/reports`.
-   С хвостом `/api/v1` путь удваивается → 404. *(В версиях DomainScope ≥ 0.24 клиент
-   стрипает хвостовой `/api/v1` сам, но привести endpoint к корню — правильно.)*
+   С хвостом `/api/v1` путь удваивается → 404. *(Клиент DomainScope **НЕ** стрипает
+   хвостовой `/api/v1` — он строит URL через `url.JoinPath(baseURL, "/api/v1/products/...")`,
+   поэтому endpoint обязан быть корнем без `/api/v1`. Любой хвост `/api/v1` в endpoint'е
+   приведёт к удвоению пути и 404.)*
 2. **`*_SARIF_PRODUCT_ID` пустой или указывает на несуществующий в Hub продукт.**
    В Helm проверьте, что `sarifProductId` зарезолвился (umbrella прокидывает UUID
    default-продукта через secret). Пустой product_id раньше молча схлопывал URL.

@@ -10,7 +10,7 @@
 #   docker compose up -d            # поднимет стек + одноразовый bootstrap
 #   docker compose restart backend  # backend применит роль администратора
 #   откройте http://localhost:3000
-#   вход: admin@hub.local / значение LOCAL_ADMIN_PASSWORD (см. .env)
+#   вход: admin@localhost.local / значение LOCAL_ADMIN_PASSWORD (см. .env)
 #
 # Остановка:           docker compose down
 # Остановка + очистка: docker compose down -v   (удалит данные БД)

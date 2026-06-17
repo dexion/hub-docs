@@ -156,12 +156,9 @@ docker compose exec postgres psql -U securityhub -d securityhub -c \
 
 ## SSRF и safety
 
-Hub читает NetBox по URL из БД (per-project). По умолчанию приватные сети разрешены (предполагается, что NetBox внутри корпсети). Если хотите ограничить:
+Hub читает NetBox по URL из БД (per-project). NetBox URL и токен задаются **per-sync-job** в модели `ScanScopeSyncJob` (через UI Hub: Project → Scope → Sync jobs), а не через env-переменные.
 
-```ini
-NETBOX_ALLOW_LOCAL_DIAL=false                                   # запретить RFC1918
-NETBOX_BASE_URL_ALLOWLIST=netbox.example.com,netbox.subsi.com  # whitelist
-```
+> **Важно:** глобальных env-гардов SSRF для NetBox-sync (вида `NETBOX_ALLOW_LOCAL_DIAL` / `NETBOX_BASE_URL_ALLOWLIST`) в backend **нет** — такие переменные не реализованы. Доступ к приватным сетям не ограничивается env-конфигом; конфигурация целевого NetBox целиком определяется per-job (URL + token + фильтры). Предполагается, что NetBox находится внутри доверенной корпоративной сети. Ограничивайте, кому разрешено заводить sync job (право `write` на проект), и при необходимости — сетевыми ACL на уровне инфраструктуры.
 
 ## Типовые проблемы
 

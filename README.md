@@ -24,7 +24,7 @@ docker compose up -d            # Hub + DomainScope + одноразовый boo
 docker compose restart backend  # backend применит роль администратора
 ```
 
-Откройте http://localhost:3000 — вход `admin@hub.local` / значение
+Откройте http://localhost:3000 — вход `admin@localhost.local` / значение
 `LOCAL_ADMIN_PASSWORD` из `.env`. Аутентификация локальная (логин/пароль),
 Keycloak не требуется.
 

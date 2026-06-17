@@ -260,7 +260,7 @@ domainscope:
 kubectl -n hub get pods
 
 # Логи backend (миграции должны прокатиться)
-kubectl -n hub logs deploy/hub-security-scan-hub-backend
+kubectl -n hub logs deploy/hub-backend
 
 # Версия
 curl https://hub.example.com/version

@@ -31,7 +31,7 @@ docker exec sshub-postgres pg_dump -U securityhub securityhub | \
   gzip > "$BACKUP_DIR/hub-$DATE.sql.gz"
 
 # DomainScope (если рядом)
-docker exec ds-postgresql pg_dump -U postgres domainscope | \
+docker exec ds-postgres pg_dump -U domainscope domainscope | \
   gzip > "$BACKUP_DIR/ds-$DATE.sql.gz"
 
 # Storage (отчёты)

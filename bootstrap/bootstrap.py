@@ -32,7 +32,10 @@ PROJECT_ID = "11111111-1111-1111-1111-111111111111"
 PRODUCT_ID = "22222222-2222-2222-2222-222222222222"
 SA_ID = "33333333-3333-3333-3333-333333333333"
 
-ADMIN_EMAIL = os.getenv("LOCAL_ADMIN_EMAIL", "admin@hub.local")
+# admin@localhost.local — тот же email, что backend создаёт сам при старте
+# (createLocalTestUser, без пароля). bootstrap навешивает на эту запись пароль
+# и роль admin через ON CONFLICT DO UPDATE. Единый логин с helm-инсталляцией.
+ADMIN_EMAIL = os.getenv("LOCAL_ADMIN_EMAIL", "admin@localhost.local")
 ADMIN_PASSWORD = os.getenv("LOCAL_ADMIN_PASSWORD", "Admin1234!")
 PRODUCT_NAME = os.getenv("SCANNER_PRODUCT_NAME", "Local Scan")
 PROJECT_NAME = os.getenv("SCANNER_PROJECT_NAME", "Local Evaluation")

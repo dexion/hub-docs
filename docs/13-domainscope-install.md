@@ -101,9 +101,11 @@ INFO SARIF uploaded to https://hub.example.com (results=N)
 
 ### 4. Health-check
 
+Health-сервер слушает на `:8080` по умолчанию (`DOMAINSCOPE_HEALTH_ADDR`), включается через `DOMAINSCOPE_HEALTH_ENABLED=true`:
+
 ```bash
-curl http://127.0.0.1:8089/health
-curl http://127.0.0.1:8089/ready
+curl http://127.0.0.1:8080/health
+curl http://127.0.0.1:8080/ready
 ```
 
 ## Способ 2: Kubernetes
@@ -120,7 +122,7 @@ domainscope:
 
   env:
     DOMAINSCOPE_DOMAINS: "example.com,subsidiary.com"
-    DOMAINSCOPE_HUB_API_ENDPOINT: "http://hub-security-scan-hub-backend:8082"
+    DOMAINSCOPE_HUB_API_ENDPOINT: "http://hub-backend:8082"
 
   postgres:
     enabled: true
@@ -170,8 +172,9 @@ Subchart `owasp-zap`. DomainScope подключается:
 
 ```ini
 DOMAINSCOPE_ZAP_ENABLED=true
-DOMAINSCOPE_ZAP_INSTANCES=http://zap-1:8080,http://zap-2:8080
-DOMAINSCOPE_ZAP_API_KEY=<из секрета>
+# JSON-массив инстансов (url + api_key на каждый). Отдельных
+# DOMAINSCOPE_ZAP_INSTANCES / DOMAINSCOPE_ZAP_API_KEY нет.
+DOMAINSCOPE_ZAP_INSTANCES_JSON=[{"url":"http://zap-1:8090","api_key":"<из секрета>"},{"url":"http://zap-2:8090","api_key":"<из секрета>"}]
 ```
 
 ### NetBox
@@ -190,9 +193,9 @@ DOMAINSCOPE_NETBOX_API_TOKEN=<token>
 # Версия
 docker compose exec domain-scope domain-scope --version
 
-# Health
-curl http://localhost:8089/health
-curl http://localhost:8089/ready
+# Health (default :8080, переопределяется DOMAINSCOPE_HEALTH_ADDR)
+curl http://localhost:8080/health
+curl http://localhost:8080/ready
 
 # Логи (события по циклам)
 docker compose logs domain-scope | tail -100

@@ -84,6 +84,12 @@ DOMAINSCOPE_RESCAN_API_KEY=<любая случайная строка ≥ 32 с
 IAC_SCANNER_RESCAN_URL=http://<iac-scanner-service>:8086
 IAC_SCANNER_RESCAN_API_KEY=<любая случайная строка ≥ 32 символов>
 
+# SSRF-защита: allowlist host'ов (comma-separated, без scheme/port), на которые
+# Hub'у разрешено слать rescan-webhook. ОБЯЗАТЕЛЕН, если задан хотя бы один из
+# *_RESCAN_URL выше — иначе Hub может быть направлен на произвольный destination
+# при operator-misconfig. Перечислите host'ы из *_RESCAN_URL.
+RESCAN_HOST_ALLOWLIST=<domainscope-service>,<iac-scanner-service>
+
 # (optional) сетевой таймаут на вызов сканер-webhook'а
 RESCAN_TIMEOUT_SECONDS=10
 ```

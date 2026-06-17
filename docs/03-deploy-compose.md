@@ -15,12 +15,10 @@
 
 В пакете поставки админу выдаются:
 
-| Файл                                 | Назначение                             |
-| ------------------------------------ | -------------------------------------- |
-| `docker-compose.yml`                 | Compose-стек со ссылками на образы Hub |
-| `.env.example`                       | Шаблон конфигурации                    |
-| `docker-compose-keycloak.yml` (опц.) | Дополнительный compose для Keycloak    |
-| `nginx.conf.example` (опц.)          | Шаблон reverse-proxy                   |
+| Файл                 | Назначение                             |
+| -------------------- | -------------------------------------- |
+| `docker-compose.yml` | Compose-стек со ссылками на образы Hub |
+| `.env.example`       | Шаблон конфигурации                    |
 
 Положите файлы в любую рабочую директорию, например `/opt/hub/`:
 
@@ -67,33 +65,30 @@ APP_ENV=production
 ```bash
 docker compose pull
 docker compose up -d
+# bootstrap создаёт администратора/токен сканера, затем backend перечитывает
+# роль admin (casbin reload) — этот шаг обязателен:
+docker compose restart backend
 ```
 
-Все образы Hub поставляются с тегом `:latest` — обновление до новой версии происходит автоматически при `docker compose pull`.
+Версия образов задаётся через `${HUB_VERSION:-0.24}` (backend/worker/frontend) и `${DS_VERSION:-0.24}` (domainscope). По умолчанию подтягивается тег `0.24`; задайте `HUB_VERSION`/`DS_VERSION` в `.env`, чтобы зафиксировать другую версию.
 
 Стек поднимает (компоненты):
 
-| Сервис     | Назначение             | Образ (Docker Hub)             | Порт хоста |
-| ---------- | ---------------------- | ------------------------------ | ---------- |
-| `postgres` | БД Hub (PostgreSQL 15) | `postgres:15`                  | 5432       |
-| `backend`  | REST API               | `dexionius/sshub-backend:latest`  | 8082       |
-| `worker`   | Async jobs             | `dexionius/sshub-worker:latest`   | —          |
-| `frontend` | Web UI                 | `dexionius/sshub-frontend:latest` | 3000       |
-| `grafana`  | Метрики (опц.)         | `grafana/grafana:11.4.0`       | 8084       |
+| Сервис        | Назначение                          | Образ (Docker Hub)                        | Порт хоста |
+| ------------- | ----------------------------------- | ----------------------------------------- | ---------- |
+| `postgres`    | БД Hub (PostgreSQL 15)              | `postgres:15`                             | 5432       |
+| `backend`     | REST API                            | `dexionius/sshub-backend:${HUB_VERSION}`  | 8082       |
+| `worker`      | Async jobs                          | `dexionius/sshub-worker:${HUB_VERSION}`   | —          |
+| `frontend`    | Web UI                              | `dexionius/sshub-frontend:${HUB_VERSION}` | 3000       |
+| `bootstrap`   | Одноразовая инициализация (админ/токен) | `python:3.12-slim`                    | —          |
+| `ds-postgres` | БД DomainScope (PostgreSQL 16, опц.) | `postgres:16-alpine`                     | —          |
+| `domainscope` | Сканер периметра (опц.)             | `dexionius/domain-scope:${DS_VERSION}`    | —          |
 
-### Закрытый контур / внутренний registry
-
-Если внешний registry недоступен, выгрузите образы во внутренний (например, Harbor). В `.env` задайте префикс:
-
-```ini
-HUB_IMAGE_REGISTRY=registry.internal.example.com/securityhub
-```
-
-`docker-compose.yml` собирает ref как `${HUB_IMAGE_REGISTRY}/sshub-backend:latest`. Все нужные образы перед использованием залейте в свой registry стандартным `docker tag` + `docker push`.
+> Образы захардкожены под Docker Hub (`dexionius/sshub-*`, `dexionius/domain-scope`). Подстановка собственного registry-префикса (`HUB_IMAGE_REGISTRY`) в текущем `docker-compose.yml` **не поддерживается**: для закрытого контура зеркальте образы под теми же именами в своём registry-зеркале (через pull-through / proxy cache).
 
 ## 4. Проверка
 
-После `docker compose up -d` подождите ~30 секунд (миграции БД стартуют автоматически):
+После `docker compose up -d` + `docker compose restart backend` подождите ~30 секунд (миграции БД стартуют автоматически, bootstrap создаёт администратора):
 
 ```bash
 # Backend жив
@@ -161,15 +156,9 @@ server {
 
 ## 6. Service-сценарии
 
-### Запуск Keycloak рядом
+### Запуск Keycloak (SSO)
 
-Если SSO нужно, используйте дополнительный compose:
-
-```bash
-docker compose -f docker-compose.yml -f docker-compose-keycloak.yml up -d
-```
-
-Дальнейшая настройка realm/client — см. [`06-integration-keycloak.md`](06-integration-keycloak.md).
+Базовый стек работает в режиме локальной аутентификации (`AUTH_MODE=LOCAL`), Keycloak не требуется. Если нужен SSO — поднимите Keycloak отдельно и переключите `AUTH_MODE`; настройка realm/client и переменных описана в [`06-integration-keycloak.md`](06-integration-keycloak.md).
 
 ## 7. Управление
 
@@ -184,9 +173,10 @@ docker compose restart backend worker
 # Остановка
 docker compose down
 
-# Обновление до новой :latest
+# Обновление до новой версии (поправьте HUB_VERSION/DS_VERSION в .env)
 docker compose pull
 docker compose up -d
+docker compose restart backend
 
 # Версия
 curl http://localhost:8082/version
@@ -194,12 +184,11 @@ curl http://localhost:8082/version
 
 ## 8. Persistence
 
-| Что                | Где                           |
-| ------------------ | ----------------------------- |
-| БД Hub             | docker volume `postgres_data` |
-| Артефакты/отчёты   | `./storage` (bind mount)      |
-| Логи               | `./logs` (bind mount)         |
-| Grafana dashboards | docker volume `grafana_data`  |
+| Что                       | Где                              |
+| ------------------------- | -------------------------------- |
+| БД Hub                    | docker volume `postgres_data`    |
+| БД DomainScope (опц.)     | docker volume `ds_postgres_data` |
+| Токен сканера (bootstrap) | docker volume `scanner_shared`   |
 
 Backup БД:
 
@@ -219,6 +208,7 @@ gunzip -c backup-20260601.sql.gz | docker compose exec -T postgres psql -U secur
 cd /opt/hub
 docker compose pull
 docker compose up -d
+docker compose restart backend
 ```
 
 Миграции БД применяются автоматически при старте backend. Подробнее: [`18-upgrades.md`](18-upgrades.md).

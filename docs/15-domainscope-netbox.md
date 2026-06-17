@@ -4,7 +4,7 @@ DomainScope умеет двусторонне работать с NetBox:
 
 - **Импорт целей** (NetBox → DomainScope): IP-адреса с указанным тегом становятся targets для сканирования
 - **Экспорт обнаруженных IP** (DomainScope → NetBox): новые IP, найденные через discovery, добавляются в NetBox с тегом
-- **Импорт DNS-зон** (опц.): через NetBox-DNS plugin
+- **Экспорт доменов в NetBox DNS** (опц., DomainScope → NetBox): обнаруженные домены публикуются как DNS-зоны и A/AAAA-записи в NetBox-DNS plugin
 
 ## Включение
 
@@ -73,21 +73,33 @@ DOMAINSCOPE_NETBOX_CRAWLER_TAG=
 
 Пустой тег — DomainScope не пишет в NetBox.
 
-## Импорт DNS-зон (NetBox-DNS plugin)
+## Экспорт доменов в NetBox DNS (NetBox-DNS plugin)
 
-Опционально DomainScope может тянуть domain-зоны из NetBox через установленный DNS-plugin:
+Опционально DomainScope **публикует** обнаруженные домены в NetBox через установленный DNS-plugin (направление DomainScope → NetBox, НЕ импорт). Семантика именно экспортная: флаг включает запись discovered-доменов в NetBox как DNS-зон и записей.
 
 ```ini
 DOMAINSCOPE_NETBOX_DNS_EXPORT_ENABLED=true
+# Обязателен при enabled=true: FQDN nameserver для SOA MNAME.
+DOMAINSCOPE_NETBOX_DNS_EXPORT_SOA_MNAME=ns1.example.com
+# Опц. — имя DNS view (default "default").
+DOMAINSCOPE_NETBOX_DNS_EXPORT_VIEW=default
+# Опц. — email SOA RNAME (default "hostmaster.<zone>", @ конвертируется в точку).
+DOMAINSCOPE_NETBOX_DNS_EXPORT_SOA_RNAME=hostmaster@example.com
 ```
 
-DomainScope:
+DomainScope (операция идемпотентна — повторный вызов не плодит дубли):
 
-- Получает список Zones из NetBox-DNS
-- Каждая зона добавляется как seed-домен для subfinder
-- Найденные subdomain'ы добавляются в БД с `source=netbox_dns`
+- Создаёт/находит DNS view и nameserver (из `SOA_MNAME`)
+- Для каждой целевой зоны создаёт/находит Zone
+- Для каждого обнаруженного домена записывает A/AAAA-записи по его IP
 
-Если plugin не установлен в вашем NetBox — оставьте `false` (default).
+Требования:
+
+- `DOMAINSCOPE_NETBOX_DNS_EXPORT_ENABLED=true` требует включённой основной NetBox-интеграции (`DOMAINSCOPE_NETBOX_ENABLED=true`)
+- `DOMAINSCOPE_NETBOX_DNS_EXPORT_SOA_MNAME` **обязателен** при enabled — без него конфиг не пройдёт валидацию
+- NetBox-DNS plugin должен быть установлен; токен должен иметь write-permission на DNS-объекты
+
+Если plugin не установлен или экспорт не нужен — оставьте `false` (default).
 
 ## NetBox: что админ должен подготовить
 
