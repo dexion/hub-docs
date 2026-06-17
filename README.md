@@ -19,14 +19,28 @@
 ```bash
 git clone https://github.com/dexion/hub-docs.git
 cd hub-docs
-cp .env.example .env
-docker compose up -d            # стек + одноразовый bootstrap (admin, проект, продукт, SA)
+cp .env.example .env            # при желании поправьте пароли, домены, порты
+docker compose up -d            # Hub + DomainScope + одноразовый bootstrap
 docker compose restart backend  # backend применит роль администратора
 ```
 
 Откройте http://localhost:3000 — вход `admin@hub.local` / значение
 `LOCAL_ADMIN_PASSWORD` из `.env`. Аутентификация локальная (логин/пароль),
 Keycloak не требуется.
+
+**Состав стека:**
+| Контейнер | Назначение |
+|-----------|-----------|
+| `sshub-postgres` | PostgreSQL для Hub (backend + worker) |
+| `sshub-backend` | Go API (AUTH_MODE=LOCAL, порт 8082) |
+| `sshub-worker` | Фоновые задачи Hub |
+| `sshub-frontend` | React SPA (порт 3000) |
+| `sshub-bootstrap` | Одноразовый init: admin, проект, SA, токен сканера |
+| `ds-postgres` | PostgreSQL для DomainScope (отдельный инстанс) |
+| `ds-scanner` | DomainScope — сканирует `DOMAINSCOPE_TARGETS`, шлёт находки в Hub |
+
+Чтобы запустить только Hub (без DomainScope), закомментируйте сервисы
+`ds-postgres` и `domainscope` в `docker-compose.yml`.
 
 ### На k3s через Helm (полноценный стенд)
 
