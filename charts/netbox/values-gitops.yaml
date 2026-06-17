@@ -1,4 +1,4 @@
-## AVP / Vault override layer for the GitOps path.
+## Слой переопределений AVP / Vault для GitOps-сценария.
 
 secrets:
   create: true

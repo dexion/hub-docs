@@ -1,7 +1,7 @@
-## NetBox — IPAM/DCIM source-of-truth (deployed at /netbox sub-path).
+## NetBox — источник истины IPAM/DCIM (разворачивается на под-пути /netbox).
 ##
-## NOT installed by hub-platform umbrella by default. Use this chart standalone
-## or via the GitOps path when you need NetBox integration.
+## НЕ устанавливается umbrella-чартом hub-platform по умолчанию. Используйте этот чарт
+## отдельно или через GitOps-сценарий, когда вам нужна интеграция с NetBox.
 
 nameOverride: ""
 fullnameOverride: ""
@@ -51,7 +51,7 @@ ingress:
   enabled: true
   className: traefik
   host: hub.example.com
-  ## Path prefix — /netbox and /netbox/* forwarded to netbox service
+  ## Префикс пути — /netbox и /netbox/* проксируются на сервис netbox
   path: /netbox(/|$)(.*)
   proxyBodySize: "25m"
   rewriteTarget: "/netbox/$2"

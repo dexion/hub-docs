@@ -1,14 +1,14 @@
-## Security Scan Hub — main platform values
+## Security Scan Hub — основные values платформы
 ##
-## Two deployment paths supported:
-##   1. Standalone helm install (default) — chart generates random passwords
-##      and stores them in <release>-security-scan-hub-secrets (kept across
-##      upgrades; survives uninstall via helm.sh/resource-policy=keep).
-##   2. Umbrella / GitOps — set secrets.existingSecretName to the name of
-##      a pre-existing Secret managed externally (umbrella chart or AVP).
-##      In that case this chart will NOT create its own Secret.
+## Поддерживаются два сценария установки:
+##   1. Standalone helm install (по умолчанию) — чарт генерирует случайные пароли
+##      и хранит их в <release>-security-scan-hub-secrets (сохраняются между
+##      upgrade'ами; переживают uninstall за счёт helm.sh/resource-policy=keep).
+##   2. Umbrella / GitOps — задайте secrets.existingSecretName с именем
+##      заранее созданного Secret, управляемого извне (umbrella-чартом или AVP).
+##      В этом случае чарт НЕ создаёт собственный Secret.
 ##
-## See values-gitops.yaml for the AVP / Vault-backed override layer.
+## Слой переопределений на базе AVP / Vault см. в values-gitops.yaml.
 
 kubernetesClusterDomain: cluster.local
 
@@ -19,30 +19,32 @@ serviceAccount:
   create: false
   name: ""
 
-## --- Sensitive values ---
+## --- Чувствительные значения ---
 ##
-## Three-tier resolution (per key):
-##   1. operator override (a non-empty value here wins)
-##   2. existing in-cluster Secret (preserved across upgrades)
-##   3. random generation (only on first install when no override)
+## Трёхуровневое разрешение (для каждого ключа):
+##   1. переопределение оператором (непустое значение здесь имеет приоритет)
+##   2. существующий Secret в кластере (сохраняется между upgrade'ами)
+##   3. случайная генерация (только при первой установке, если нет переопределения)
 ##
-## Set existingSecretName to point this chart at an externally managed Secret
-## (umbrella chart, ESO, AVP). When set, chart-side generation is disabled.
+## Задайте existingSecretName, чтобы направить чарт на Secret, управляемый извне
+## (umbrella-чарт, ESO, AVP). При заданном значении генерация на стороне чарта
+## отключается.
 secrets:
   create: true
   existingSecretName: ""
-  # Override individual keys here (leave empty to auto-generate on first install)
+  # Переопределите отдельные ключи здесь (оставьте пустым для авто-генерации при первой установке)
   dbPassword: ""
   jwtSecret: ""
   ## OAuth2/OIDC client secret. Бинарник хаба читает его как KEYCLOAK_CLIENT_SECRET
   ## ВСЕГДА (даже в AUTH_MODE=LOCAL — там используется для подписи внутренних
-  ## токенов). Имя env-переменной historic, по сути это generic auth secret.
+  ## токенов). Имя env-переменной сложилось исторически, по сути это generic auth secret.
   authClientSecret: ""
   llmApiKey: ""
   iacScannerApiKey: ""
-  ## Пароль локального админа (auto-генерация). Backend при старте создаёт
-  ## пользователя admin@hub.local если LOCAL_ADMIN_PASSWORD задан И в БД нет
-  ## пользователей. Переустановки/upgrade'ы не пересоздают если юзер есть.
+  ## Пароль локального админа (авто-генерация). При старте backend создаёт
+  ## пользователя admin@localhost.local, если LOCAL_ADMIN_PASSWORD задан И в БД нет
+  ## пользователей. Переустановки/upgrade'ы не пересоздают пользователя, если он есть.
+  ## (Для helm-установки логин — admin@localhost.local.)
   localAdminPassword: ""
 
 backend:
@@ -68,13 +70,13 @@ backend:
     env:
       appEnv: production
       serverPort: "8082"
-      dbHost: ""              # auto = <fullname>-postgres
+      dbHost: ""              # авто = <fullname>-postgres
       dbPort: "5432"
       dbName: securityhub
       dbUser: securityhub
       frontendUrl: https://hub.example.com
-      ## Auth: hub supports AUTH_MODE=LOCAL (no external IDP) or SSO (Keycloak/OIDC).
-      ## Default LOCAL — set keycloakUrl/Realm/ClientId to enable SSO.
+      ## Auth: хаб поддерживает AUTH_MODE=LOCAL (без внешнего IDP) или SSO (Keycloak/OIDC).
+      ## По умолчанию LOCAL — задайте keycloakUrl/Realm/ClientId, чтобы включить SSO.
       authMode: LOCAL
       keycloakUrl: ""
       keycloakPublicUrl: ""
@@ -85,10 +87,10 @@ backend:
       fallbackJiraUrl: ""
       llmBaseUrl: ""
       llmModel: "glm-4-plus"
-      llmDryRun: "true"      # default: don't actually call LLM until configured
+      llmDryRun: "true"      # по умолчанию: не обращаться к LLM, пока не настроено
       llmFalsePositiveThreshold: "0.9"
       llmRequestTimeoutSeconds: "180"
-      llmWorkers: "0"        # backend only enqueues, worker executes
+      llmWorkers: "0"        # backend только ставит в очередь, выполняет worker
       sandboxType: ""
       ## STORAGE_PATH — subdir под volume /app/storage. Без него backend дефолтит
       ## в корень volume (root-owned) и upload отчётов падает с chmod EPERM
@@ -121,7 +123,7 @@ worker:
         memory: "2Gi"
     env:
       appEnv: production
-      dbHost: ""              # auto = <fullname>-postgres
+      dbHost: ""              # авто = <fullname>-postgres
       dbPort: "5432"
       dbName: securityhub
       dbUser: securityhub
@@ -133,7 +135,7 @@ worker:
       llmWorkers: "3"
       sandboxType: "kubernetes"
       sandboxImage: "dexionius/sshub-sandbox-tools:latest"
-      sandboxNamespace: ""    # auto = release namespace
+      sandboxNamespace: ""    # авто = namespace релиза
       sandboxTimeoutSeconds: "120"
       sandboxOutputLimitKb: "10"
       sandboxWgSecretName: ""
@@ -200,32 +202,32 @@ iacScanner:
 
 ## --- Ingress ---
 ##
-## className: traefik (k3s default) or nginx
-## When using nginx, install ingress-nginx chart separately.
+## className: traefik (по умолчанию в k3s) или nginx
+## При использовании nginx установите чарт ingress-nginx отдельно.
 ingress:
   enabled: true
   className: traefik
   host: hub.example.com
-  ## Class-specific knobs (nginx only)
+  ## Параметры, специфичные для класса (только nginx)
   proxyBodySize: "100m"
   proxyReadTimeout: "300"
-  ## Class-specific knobs (traefik only)
+  ## Параметры, специфичные для класса (только traefik)
   traefikEntrypoints: "web,websecure"
-  ## Extra annotations merged after class-specific ones
+  ## Дополнительные аннотации, добавляемые после специфичных для класса
   extraAnnotations: {}
 
 ## --- TLS ---
 ##
 ## mode:
-##   selfsigned   — cert-manager SelfSigned ClusterIssuer (default; works air-gapped)
-##   letsencrypt  — cert-manager + Let's Encrypt (requires public DNS + reachable HTTP-01)
-##   existing     — supply your own pre-created Secret via existingSecretName
-##   disabled     — HTTP only (no TLS in ingress)
+##   selfsigned   — cert-manager SelfSigned ClusterIssuer (по умолчанию; работает в air-gapped)
+##   letsencrypt  — cert-manager + Let's Encrypt (требует публичный DNS + доступный HTTP-01)
+##   existing     — укажите собственный заранее созданный Secret через existingSecretName
+##   disabled     — только HTTP (без TLS в ingress)
 tls:
   mode: selfsigned
-  ## Override the cert-manager ClusterIssuer name (advanced)
+  ## Переопределите имя cert-manager ClusterIssuer (для опытных пользователей)
   issuer: ""
-  ## Required when mode=existing
+  ## Обязательно при mode=existing
   existingSecretName: ""
 
 pvc:
@@ -248,9 +250,9 @@ pvc:
 defaultProject:
   enabled: false
 
-## --- Sandbox WireGuard egress (optional) ---
-## When enabled, sandbox jobs route their traffic through a WireGuard peer.
-## Generate keys with scripts/wg/2-generate-clients.sh; see docs/wireguard.md.
+## --- Sandbox WireGuard egress (опционально) ---
+## При включении задачи sandbox направляют свой трафик через WireGuard-пир.
+## Сгенерируйте ключи через scripts/wg/2-generate-clients.sh; см. docs/wireguard.md.
 sandboxWg:
   enabled: false
   privateKey: ""
@@ -258,13 +260,14 @@ sandboxWg:
   serverEndpoint: ""
   podIp: ""
 
-## --- Demo reseed (sshub.ru demo stand) ---
+## --- Demo reseed (демо-стенд sshub.ru) ---
 ##
-## When enabled, deploys a CronJob that periodically TRUNCATEs the DB and reseeds
-## a fresh demo dataset (scripts vendored under seed/), uploads a rich SARIF, and
-## restarts the backend so Casbin/in-memory state reloads. OFF by default — only
-## for throwaway demo environments. See values-demo.yaml for the full overlay.
+## При включении разворачивает CronJob, который периодически делает TRUNCATE БД и
+## заново наливает свежий демо-датасет (скрипты лежат в seed/), загружает богатый
+## SARIF и перезапускает backend, чтобы перечиталось состояние Casbin/in-memory.
+## По умолчанию ВЫКЛЮЧЕНО — только для одноразовых демо-окружений. Полный overlay
+## см. в values-demo.yaml.
 demoReseed:
   enabled: false
-  schedule: "0 */4 * * *"   # every 4 hours
-  scale: small              # small | medium | large (passed to seed_demo.py)
+  schedule: "0 */4 * * *"   # каждые 4 часа
+  scale: small              # small | medium | large (передаётся в seed_demo.py)

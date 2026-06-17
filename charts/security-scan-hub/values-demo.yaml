@@ -1,19 +1,19 @@
-## values-demo.yaml — overlay for the sshub.ru public demo stand
+## values-demo.yaml — overlay для публичного демо-стенда sshub.ru
 ##
-## Apply with:
+## Применение:
 ##   helm upgrade hub charts/security-scan-hub -n hub -f charts/security-scan-hub/values-demo.yaml
 ##
-## This reconciles the live demo (which was previously patched ad-hoc via kubectl)
-## back into a reproducible chart-managed state.
+## Приводит работающее демо (которое раньше патчилось ad-hoc через kubectl)
+## обратно к воспроизводимому состоянию, управляемому чартом.
 ##
-## SECRETS ARE NOT SET HERE. secrets.llmApiKey (GLM key) and secrets.dbPassword live
-## in the in-cluster Secret (<release>-secrets, helm.sh/resource-policy=keep — preserved
-## across upgrades). The GLM key must NEVER be committed to git.
+## СЕКРЕТЫ ЗДЕСЬ НЕ ЗАДАЮТСЯ. secrets.llmApiKey (ключ GLM) и secrets.dbPassword хранятся
+## в Secret внутри кластера (<release>-secrets, helm.sh/resource-policy=keep — сохраняется
+## между upgrade'ами). Ключ GLM НИКОГДА не должен попадать в git.
 
 backend:
   backend:
     image:
-      pullPolicy: Always        # demo runs tag=latest; always pull fresh
+      pullPolicy: Always        # демо работает на tag=latest; всегда тянуть свежий
     env:
       authMode: LOCAL
       frontendUrl: https://sshub.ru
@@ -31,15 +31,15 @@ worker:
       llmBaseUrl: https://api.z.ai/api/coding/paas/v4
       llmModel: glm-5.1
       llmDryRun: "false"
-      sandboxType: ""                   # DISABLE sandbox — no real network probes on demo
-      telegramNotificationWorkers: "1"  # NOT 0 (River rejects 0 workers for a queue)
+      sandboxType: ""                   # ОТКЛЮЧИТЬ sandbox — на демо нет реальных сетевых проб
+      telegramNotificationWorkers: "1"  # НЕ 0 (River не принимает 0 воркеров для очереди)
 
 frontend:
   frontend:
     image:
       pullPolicy: Always
     env:
-      apiUrl: https://sshub.ru          # same-origin so local-login auth/config works (else SSO fallback)
+      apiUrl: https://sshub.ru          # same-origin, чтобы работал local-login auth/config (иначе fallback на SSO)
       authMode: LOCAL
 
 ingress:
@@ -50,9 +50,9 @@ demoReseed:
   schedule: "0 */4 * * *"
   scale: small
 
-## --- Scanners NOT part of this chart ---
+## --- Сканеры, НЕ входящие в этот чарт ---
 ##
-## openvas / owasp-zap / domainscope are SEPARATE charts/releases. On the demo
-## environment they MUST NOT run (no real scans against public targets). Do not
-## deploy those releases here; if already installed, scale them to 0 replicas.
-## They are intentionally absent from this overlay.
+## openvas / owasp-zap / domainscope — это ОТДЕЛЬНЫЕ чарты/релизы. В демо-окружении
+## они НЕ должны работать (никаких реальных сканов публичных целей). Не разворачивайте
+## эти релизы здесь; если они уже установлены, масштабируйте их до 0 реплик.
+## В этом overlay они намеренно отсутствуют.

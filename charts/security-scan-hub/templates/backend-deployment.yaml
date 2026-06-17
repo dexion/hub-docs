@@ -57,7 +57,7 @@ spec:
               name: {{ include "chart.secretsName" . }}
               key: jwtSecret
         - name: FRONTEND_URL
-          ## tpl allows umbrella to inject {{ .Values.domain }}-style URLs.
+          ## tpl позволяет umbrella-чарту подставлять URL вида {{ .Values.domain }}.
           value: {{ tpl (.Values.backend.backend.env.frontendUrl | default "") . | quote }}
         - name: AUTH_MODE
           value: {{ .Values.backend.backend.env.authMode | quote }}
@@ -77,9 +77,10 @@ spec:
             secretKeyRef:
               name: {{ include "chart.secretsName" . }}
               key: authClientSecret
-        ## При первом старте бэкэнд создаст юзера admin@hub.local с этим
-        ## паролем (если в БД ещё нет ни одного юзера). На последующих стартах
-        ## ничего не делает (ENV игнорится). Имя пользователя: admin.
+        ## При первом старте backend создаст пользователя admin@localhost.local
+        ## с этим паролем (если в БД ещё нет ни одного пользователя). На последующих
+        ## стартах ничего не делает (ENV игнорируется). Для helm-установки
+        ## логин — admin@localhost.local.
         - name: LOCAL_ADMIN_PASSWORD
           valueFrom:
             secretKeyRef:

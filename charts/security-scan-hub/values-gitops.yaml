@@ -1,20 +1,20 @@
-## Override layer for the GitOps / ArgoCD + Vault path.
+## Слой переопределений для сценария GitOps / ArgoCD + Vault.
 ##
-## Render with the AVP plugin:
+## Рендеринг через плагин AVP:
 ##   helm template <release> charts/security-scan-hub \
 ##     -f charts/security-scan-hub/values.yaml \
 ##     -f charts/security-scan-hub/values-gitops.yaml \
 ##     | argocd-vault-plugin generate -
 ##
-## When the AVP plugin processes this file, the <path:...> placeholders are
-## replaced with values pulled from Vault (kv/data/hub/prod path). The chart
-## itself does not need the placeholders rendered — secretKeyRef points at
-## the same Secret that AVP / ESO populates.
+## Когда плагин AVP обрабатывает этот файл, плейсхолдеры <path:...> заменяются
+## значениями, извлечёнными из Vault (путь kv/data/hub/prod). Самому чарту
+## рендеринг плейсхолдеров не требуется — secretKeyRef ссылается на тот же
+## Secret, который наполняет AVP / ESO.
 
 secrets:
-  ## Either set existingSecretName when AVP/ESO produces the Secret directly:
+  ## Либо задайте existingSecretName, когда AVP/ESO создаёт Secret напрямую:
   existingSecretName: ""
-  ## …or let the chart create the Secret from these AVP-resolved values:
+  ## …либо позвольте чарту создать Secret из этих разрешённых через AVP значений:
   create: true
   dbPassword: "<path:kv/data/hub/prod#dbPassword>"
   jwtSecret: "<path:kv/data/hub/prod#jwtSecret>"
@@ -43,7 +43,7 @@ frontend:
       keycloakRealm: securityhub
       keycloakClientId: securityhub
 
-## Production-grade ingress: nginx + Let's Encrypt
+## Ingress production-уровня: nginx + Let's Encrypt
 ingress:
   className: nginx
   proxyBodySize: "100m"
@@ -53,7 +53,7 @@ tls:
   mode: letsencrypt
   issuer: letsencrypt-prod
 
-## Sandbox WG (kept disabled here; populated from Vault when needed)
+## Sandbox WG (здесь оставлен выключенным; наполняется из Vault при необходимости)
 sandboxWg:
   enabled: false
   privateKey: "<path:kv/data/hub/prod#sandboxWgPrivateKey>"

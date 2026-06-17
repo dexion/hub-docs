@@ -1,4 +1,4 @@
-## AVP / Vault override layer for the GitOps path. See security-scan-hub/values-gitops.yaml.
+## Слой переопределений AVP / Vault для GitOps-сценария. См. security-scan-hub/values-gitops.yaml.
 
 secrets:
   create: true
@@ -10,7 +10,7 @@ secrets:
 
 domainscope:
   env:
-    # Корень Hub БЕЗ /api/v1 — клиент дописывает /api/v1/products/<id>/reports сам (issue #35).
+    # Корень Hub БЕЗ /api/v1 — клиент сам дописывает /api/v1/products/<id>/reports (issue #35).
     sarifApiEndpoint: "http://security-scan-hub-backend.security-scan-hub:8082"
     openvasEnabled: "true"
     openvasHost: "openvas-gvmd.openvas"

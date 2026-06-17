@@ -1,8 +1,8 @@
-## GitOps overlay — render with ArgoCD Vault Plugin (AVP).
+## GitOps-оверлей — рендерится через ArgoCD Vault Plugin (AVP).
 ##
-## Merge order: values.yaml ← values-gitops.yaml. The placeholders below
-## are replaced with values pulled from Vault path kv/data/scans/prod at
-## render time.
+## Порядок слияния: values.yaml ← values-gitops.yaml. Плейсхолдеры ниже
+## заменяются значениями, извлекаемыми из пути Vault kv/data/scans/prod во
+## время рендера.
 
 secrets:
   create: true

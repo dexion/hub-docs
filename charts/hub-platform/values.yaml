@@ -1,24 +1,25 @@
-## Hub-platform — umbrella chart for Security Hub.
+## Hub-platform — umbrella-чарт для Security Hub.
 ##
-## Single helm install of:
+## Один helm install устанавливает:
 ##   - security-scan-hub  (alias: hub)
 ##   - domainscope
 ##   - openvas
 ##   - owasp-zap          (alias: zap)
 ##
-## All shared/sensitive values are managed centrally in this umbrella's
-## `templates/master-secrets.yaml`. Each subchart is configured to use those
-## pre-created Secrets via `secrets.existingSecretName`.
+## Все общие/чувствительные значения управляются централизованно в этом umbrella
+## через `templates/master-secrets.yaml`. Каждый subchart настроен использовать
+## эти заранее созданные Secrets через `secrets.existingSecretName`.
 ##
-## --- Top-level controls ---
+## --- Управление верхнего уровня ---
 
-## --- Global values (auto-propagated to all subcharts as .Values.global.*) ---
+## --- Global-значения (автоматически проброшены во все subchart'ы как .Values.global.*) ---
 ##
-## Helm copies the `global:` block into every subchart's values, so subcharts
-## can read these via `.Values.global.<key>` from inside `tpl`-rendered fields.
+## Helm копирует блок `global:` в values каждого subchart'а, поэтому subchart'ы
+## могут читать их через `.Values.global.<key>` внутри `tpl`-рендеримых полей.
 global:
-  ## Public hostname users hit in the browser. ALL ingress objects use this.
-  ## For multi-host setups (separate openvas/zap hosts), override per subchart.
+  ## Публичное имя хоста, по которому пользователи заходят в браузере. Все ingress
+  ## объекты используют его. Для multi-host (отдельные хосты openvas/zap)
+  ## переопределите в каждом subchart отдельно.
   domain: hub.example.com
 
   ## Default project — создаётся seed-admin Job'ом в БД hub'а при первом install.
@@ -31,45 +32,45 @@ global:
     enabled: true
     projectName: "Default"
     productName: "example.com"
-    ## Скоуп сканирования (через запятую если несколько доменов).
-    ## ВАЖНО: переопредели через --set global.defaultProject.scope=mycorp.com
+    ## Скоуп сканирования (через запятую, если несколько доменов).
+    ## ВАЖНО: переопределите через --set global.defaultProject.scope=mycorp.com
     ## или после установки в Hub UI. example.com — placeholder.
     scope: "example.com"
-    ## Можно зафорсить конкретный UUID (миграция со старого инсталла), иначе
-    ## uuidv4 сгенерится автоматом и сохранится в hub-secrets.
+    ## При необходимости можно задать конкретный UUID (миграция со старого
+    ## инсталла), иначе uuidv4 сгенерируется автоматически и сохранится в hub-secrets.
     projectId: ""
     productId: ""
 
-## Convenience top-level alias (mirrors global.domain; the umbrella's own
-## templates use this — subcharts use global.domain).
+## Удобный alias верхнего уровня (повторяет global.domain; собственные шаблоны
+## umbrella используют его — subchart'ы используют global.domain).
 domain: hub.example.com
 
-## Authentication mode for the hub UI/API:
-##   LOCAL  — local username/password (no external IDP). Default for quick install.
-##   SSO    — Keycloak/OIDC (configure in hub.backend.env.keycloak* below).
+## Режим аутентификации для hub UI/API:
+##   LOCAL  — локальный логин/пароль (без внешнего IDP). По умолчанию для быстрой установки.
+##   SSO    — Keycloak/OIDC (настройте в hub.backend.env.keycloak* ниже).
 authMode: LOCAL
 
-## --- Ingress (applied to all subcharts unless overridden) ---
+## --- Ingress (применяется ко всем subchart'ам, если не переопределено) ---
 ingress:
-  ## traefik (k3s default) or nginx
+  ## traefik (по умолчанию в k3s) или nginx
   className: traefik
 
-## --- TLS (applied to all subcharts unless overridden) ---
+## --- TLS (применяется ко всем subchart'ам, если не переопределено) ---
 tls:
   ## selfsigned | letsencrypt | existing | disabled
   mode: selfsigned
-  ## Override the cert-manager ClusterIssuer (advanced)
+  ## При необходимости переопределите cert-manager ClusterIssuer (для продвинутых сценариев)
   issuer: ""
-  ## Required when mode=existing
+  ## Обязательно при mode=existing
   existingSecretName: ""
-  ## Operator email (used for letsencrypt-prod ClusterIssuer; managed by install.sh)
+  ## Email оператора (используется для letsencrypt-prod ClusterIssuer; управляется install.sh)
   letsencryptEmail: "admin@example.com"
 
-## --- Master secrets (umbrella-managed) ---
+## --- Master secrets (управляются umbrella) ---
 ##
-## Leaving any value empty causes the umbrella to generate a random one on first
-## install and preserve it across upgrades (helm.sh/resource-policy=keep + lookup).
-## Subcharts reference these Secrets by name — never set their own.
+## Если оставить любое значение пустым, umbrella сгенерирует случайное при первой
+## установке и сохранит его между upgrade'ами (helm.sh/resource-policy=keep + lookup).
+## Subchart'ы ссылаются на эти Secrets по имени — никогда не задают свои.
 secrets:
   ## security-scan-hub
   hubDbPassword: ""
@@ -77,32 +78,32 @@ secrets:
   hubKeycloakClientSecret: ""           # авто; binding env: KEYCLOAK_CLIENT_SECRET
   hubLlmApiKey: ""
   hubIacScannerApiKey: ""
-  hubLocalAdminPassword: ""             # авто; logic: backend seedLocalAdmin()
+  hubLocalAdminPassword: ""             # авто; логика: backend seedLocalAdmin()
   ## domainscope
   domainscopeDbPassword: ""
-  domainscopeSarifApiToken: ""           # hub-issued; left empty initially
+  domainscopeSarifApiToken: ""           # выдаётся hub'ом; изначально оставляется пустым
   domainscopeNetboxApiToken: ""
-  ## openvas (admin password is also used by domainscope as openvasPassword)
+  ## openvas (admin-пароль также используется domainscope как openvasPassword)
   openvasAdminPassword: ""
   openvasDbPassword: ""
-  ## ZAP API key (also propagated to domainscope ZAP_INSTANCES_JSON)
+  ## ZAP API key (также пробрасывается в domainscope ZAP_INSTANCES_JSON)
   zapApiKey: ""
 
-## --- WireGuard egress (recommended for outbound scanners) ---
+## --- WireGuard egress (рекомендуется для исходящих сканеров) ---
 ##
-## See scripts/wg/ for keypair generation. Workflow:
-##   1. Run scripts/wg/1-setup-server.sh on the WG server.
-##   2. Run scripts/wg/2-generate-clients.sh on the operator machine — it
-##      outputs both the values block below AND the [Peer] entries to
-##      append on the server.
-##   3. Run scripts/wg/3-register-peers.sh on the WG server.
-##   4. helm install / helm upgrade with wireguard.enabled=true.
+## Генерация пары ключей описана в scripts/wg/. Порядок действий:
+##   1. Запустите scripts/wg/1-setup-server.sh на WG-сервере.
+##   2. Запустите scripts/wg/2-generate-clients.sh на машине оператора — он
+##      выводит и блок values ниже, И записи [Peer], которые нужно добавить
+##      на сервере.
+##   3. Запустите scripts/wg/3-register-peers.sh на WG-сервере.
+##   4. Выполните helm install / helm upgrade с wireguard.enabled=true.
 wireguard:
   enabled: false
-  ## WG server's public key + endpoint host:port (same for all peers).
+  ## Публичный ключ WG-сервера + endpoint host:port (одинаковые для всех пиров).
   serverPublicKey: ""
   serverEndpoint: ""
-  ## Per-peer config. Each peer gets its own privateKey + intra-tunnel IP.
+  ## Конфигурация по каждому пиру. Каждый пир получает свой privateKey + IP внутри туннеля.
   peers:
     domainscope:
       privateKey: ""
@@ -115,13 +116,14 @@ wireguard:
       podIp: "10.200.0.4/32"
 
 ## ---------------------------------------------------------------------------
-## Subchart configuration. The umbrella forwards top-level toggles into each
-## subchart and pins the existingSecretName so subcharts skip self-generation.
+## Конфигурация subchart'ов. Umbrella пробрасывает переключатели верхнего уровня
+## в каждый subchart и фиксирует existingSecretName, чтобы subchart'ы не
+## генерировали секреты самостоятельно.
 ## ---------------------------------------------------------------------------
 
-## Below: subchart values forwarded from the umbrella.
-## All cross-references use Helm `tpl` in the subchart so we can inject
-## .Release.Name (= "<release>") at install time.
+## Ниже: значения subchart'ов, проброшенные из umbrella.
+## Все перекрёстные ссылки используют Helm `tpl` внутри subchart'а, чтобы можно
+## было подставить .Release.Name (= "<release>") во время установки.
 
 hub:
   enabled: true
@@ -148,9 +150,9 @@ hub:
         apiUrl: 'https://{{ .Values.global.domain | default "hub.example.com" }}'
         authMode: LOCAL
   iacScanner:
-    ## По умолчанию ВЫКЛЮЧЕН: iac-scanner запрашивает /api/v1/products/scan-enabled
-    ## который требует Service Account (с scope list_products). SA создаётся
-    ## админом через hub UI после первого логина. После этого:
+    ## По умолчанию ВЫКЛЮЧЕН: iac-scanner запрашивает /api/v1/products/scan-enabled,
+    ## который требует Service Account (со scope list_products). SA создаётся
+    ## администратором через hub UI после первого логина. После этого:
     ##   helm upgrade hub charts/hub-platform --reuse-values \
     ##     --set hub.iacScanner.enabled=true \
     ##     --set secrets.hubIacScannerApiKey=<sa-key>
@@ -159,7 +161,7 @@ hub:
       vmsApiUrl: 'http://{{ if contains "hub" .Release.Name }}{{ .Release.Name }}{{ else }}{{ .Release.Name }}-hub{{ end }}-backend.{{ .Release.Namespace }}:8082/api/v1'
   ingress:
     enabled: true
-    className: traefik                   # operator may override
+    className: traefik                   # при необходимости оператор может переопределить
     host: '{{ .Values.global.domain | default "hub.example.com" }}'
   tls:
     mode: selfsigned
@@ -170,9 +172,9 @@ domainscope:
     create: false
     existingSecretName: '{{ .Release.Name }}-domainscope-secrets'
   wireguard:
-    enabled: false                       # mirrored from top-level wireguard.enabled
+    enabled: false                       # повторяет wireguard.enabled верхнего уровня
     existingSecretName: '{{ .Release.Name }}-domainscope-wireguard'
-    privateKey: " "                      # required-stub; secret comes from umbrella
+    privateKey: " "                      # обязательная заглушка; секрет приходит из umbrella
     serverPublicKey: " "
     serverEndpoint: " "
     podIp: "10.200.0.2/32"
@@ -181,7 +183,8 @@ domainscope:
       ## DOMAINSCOPE_DOMAINS пуст: scope забирается из Hub Scope API (см. ниже).
       domains: ""
       ## Hub backend для scope export + SARIF upload (один и тот же сервис,
-      ## разные пути). Pattern handles release-contains-name vs не-contains.
+      ## разные пути). Шаблон учитывает оба случая: когда release содержит имя
+      ## и когда не содержит.
       hubEnabled: "true"
       hubApiEndpoint: 'http://{{ if contains "hub" .Release.Name }}{{ .Release.Name }}{{ else }}{{ .Release.Name }}-hub{{ end }}-backend.{{ .Release.Namespace }}:8082'
       ## ВАЖНО: корень Hub БЕЗ /api/v1 — SARIF-клиент DomainScope сам дописывает
@@ -196,13 +199,13 @@ domainscope:
       ## subchart deployment'е НЕ добавило плоский env (в Secret-source приоритет).
       sarifProductId: ""
       openvasEnabled: "true"
-      ## Auto-wired: openvas gvmd service (similar conditional naming).
+      ## Связывается автоматически: сервис openvas gvmd (аналогичное условное именование).
       openvasHost: '{{ if contains "openvas" .Release.Name }}{{ .Release.Name }}{{ else }}{{ .Release.Name }}-openvas{{ end }}-gvmd.{{ .Release.Namespace }}'
       openvasPort: "9390"
       openvasUsername: "admin"
       zapEnabled: "true"
-      ## ZAP_INSTANCES_JSON is consumed via secretKeyRef from the umbrella secret.
-      ## (Empty here so legacy code path doesn't override the secret value.)
+      ## ZAP_INSTANCES_JSON читается через secretKeyRef из секрета umbrella.
+      ## (Здесь пусто, чтобы legacy-ветка кода не перезаписала значение из секрета.)
       zapInstancesJson: ""
       zapActiveScanPolicy: "Default Policy"
 
@@ -225,7 +228,7 @@ openvas:
   tls:
     mode: selfsigned
   feedInit:
-    enabled: true                        # ⚠ first sync 1–3h, ~5GB
+    enabled: true                        # ⚠ первая синхронизация 1–3 ч, ~5 ГБ
 
 zap:
   enabled: true
@@ -246,6 +249,7 @@ zap:
     mode: selfsigned
 
 netbox:
-  ## NetBox is NOT included in the default umbrella (per agreed scope).
-  ## To install alongside, add a dependency to Chart.yaml and uncomment values here.
+  ## NetBox НЕ входит в umbrella по умолчанию (согласно согласованному scope).
+  ## Чтобы установить его рядом, добавьте dependency в Chart.yaml и раскомментируйте
+  ## значения здесь.
   enabled: false
