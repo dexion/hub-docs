@@ -32,7 +32,7 @@ postgres:
     tag: "16"
   storage:
     size: 10Gi
-    storageClassName: local-path
+    storageClassName: ""   # "" = кластерный default storageclass (портируемо); задайте свой для конкретного CSI
 
 redis:
   image:
@@ -40,12 +40,12 @@ redis:
     tag: 7-alpine
   storage:
     size: 1Gi
-    storageClassName: local-path
+    storageClassName: ""   # "" = кластерный default storageclass (портируемо); задайте свой для конкретного CSI
 
 storage:
   media:
     size: 5Gi
-    storageClassName: local-path
+    storageClassName: ""   # "" = кластерный default storageclass (портируемо); задайте свой для конкретного CSI
 
 ingress:
   enabled: true

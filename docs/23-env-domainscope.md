@@ -1,6 +1,6 @@
 # Переменные окружения — DomainScope
 
-Все переменные DomainScope имеют префикс `DOMAINSCOPE_`. Приоритет конфигурации: **ENV > YAML (`config-example.yml` / `/etc/domain-scope/settings.yml`) > defaults в `LoadConfig()`**.
+Большинство переменных DomainScope имеют префикс `DOMAINSCOPE_` (конфиг агента). Несколько переменных префикса НЕ имеют — это rescan/probe HTTP-сервер, логгер и DNS-резолвер (см. раздел «Без префикса DOMAINSCOPE_» в конце). Приоритет конфигурации: **ENV > YAML (`config-example.yml` / `/etc/domain-scope/settings.yml`) > defaults в `LoadConfig()`**.
 
 - bool принимает `true/false/1/0/yes/no/on/off` (регистронезависимо);
 - числа — unsigned int; списки — через запятую;
@@ -203,6 +203,21 @@
 | `DOMAINSCOPE_HUB_CALLBACK_HMAC_SECRET` | HMAC исходящего callback. Обязателен при verify. Секрет | строка | пусто |
 | `DOMAINSCOPE_HUB_CALLBACK_HOSTS` | Allowlist хостов callback по HTTPS (anti-SSRF) | CSV хостов | пусто |
 | `DOMAINSCOPE_HUB_CALLBACK_HTTP_HOSTS` | Allowlist хостов callback по HTTP (anti-SSRF) | CSV хостов | пусто |
+
+## Без префикса DOMAINSCOPE_ (rescan/probe сервер, логгер, DNS)
+
+Эти переменные читаются напрямую (не через `config_env.go`), поэтому НЕ имеют
+префикса `DOMAINSCOPE_`.
+
+| Переменная | Назначение | Значения | По умолчанию |
+|---|---|---|---|
+| `RESCAN_API_KEY` | **Мастер-переключатель** inbound rescan/probe/verify HTTP-сервера. Не задан → сервер не стартует (весь блок rescan/verify неактивен). Секрет | строка | пусто |
+| `RESCAN_LISTEN_ADDR` | Адрес прослушивания rescan-сервера | `host:port` | пусто (дефолт внутри сервера) |
+| `RESCAN_EXPECTED_PROJECT_ID` | Если задан — принимаются только rescan-запросы с совпадающим `project_id`; иначе любой | UUID | пусто (любой) |
+| `PROBE_ALLOW_PRIVATE` | Разрешить probe/verify приватные (RFC1918) адреса (anti-SSRF override) | `true` \| `false` | `false` |
+| `SCANNER_DNS_SERVER` | Кастомный DNS-сервер для резолва целей | `host[:port]` | пусто (= системный resolver) |
+| `LOG_LEVEL` | Уровень логирования | `debug` \| `info` \| `warn` \| `error` | внутренний дефолт логгера |
+| `APP_ENV` | Fallback для `DOMAINSCOPE_ENV`, если тот не задан | `production` \| `dev` \| … | пусто |
 
 ## Условно обязательные переменные
 

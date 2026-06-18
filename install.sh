@@ -132,10 +132,13 @@ if [[ "$DNS_FIX" -eq 1 ]]; then
     CURRENT=$(kubectl -n kube-system get cm coredns -o jsonpath='{.data.Corefile}' 2>/dev/null || true)
     if echo "$CURRENT" | grep -q 'forward . /etc/resolv.conf'; then
       log "Чиню CoreDNS: forward → ${UPSTREAMS}(stub 127.0.0.53 недостижим из подов)..."
-      PATCHED=$(echo "$CURRENT" | sed "s#forward \. /etc/resolv.conf#forward . ${UPSTREAMS}#")
-      PATCH_JSON=$(PATCHED="$PATCHED" python3 -c \
-        'import json,os;print(json.dumps({"data":{"Corefile":os.environ["PATCHED"]}}))')
-      kubectl -n kube-system patch cm coredns --type=merge -p "$PATCH_JSON"
+      # Чистый shell без python: берём ConfigMap как YAML, меняем forward-строку,
+      # применяем через replace (k3s создаёт CM не через apply, поэтому apply
+      # ругается на отсутствие last-applied-configuration — replace такого не
+      # требует). forward-директива в Corefile уникальна.
+      kubectl -n kube-system get cm coredns -o yaml \
+        | sed "s#forward \. /etc/resolv.conf#forward . ${UPSTREAMS}#" \
+        | kubectl -n kube-system replace -f - >/dev/null
       kubectl -n kube-system rollout restart deploy/coredns >/dev/null 2>&1 || true
       # Дожидаемся перезапуска CoreDNS ДО установки приложения. Иначе сканер
       # стартует, пока CoreDNS ещё перезагружается, первый discovery-цикл не
@@ -193,6 +196,11 @@ log "Устанавливаю hub-platform (release=${RELEASE}, ns=${NAMESPACE})
 HELM_ARGS=(
   upgrade --install "${RELEASE}" "${SCRIPT_DIR}/charts/hub-platform"
   --namespace "${NAMESPACE}" --create-namespace
+  # post-install hook seed-admin ждёт, пока backend домигрирует БД. На медленном
+  # старте (эмуляция amd64 на arm, холодный pull образов) дефолтные 5 мин helm
+  # не хватает → "post-install hooks failed". Даём запас. Переопределить:
+  # HELM_TIMEOUT=30m ./install.sh
+  --timeout "${HELM_TIMEOUT:-15m}"
   --set "global.domain=${DOMAIN}"
   --set "domain=${DOMAIN}"
   --set "ingress.className=${INGRESS_CLASS}"

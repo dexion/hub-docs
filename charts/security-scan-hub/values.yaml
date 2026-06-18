@@ -240,15 +240,23 @@ tls:
   existingSecretName: ""
 
 pvc:
+  ## backendStorage — сюда backend пишет ЗАГРУЖЕННЫЕ отчёты (/app/storage/reports).
+  ## Файлы хранятся по retention (по умолчанию completed 7 дней, см. cleanup
+  ## CLEANUP_RETENTION_* в backend) и удаляются report-cleanup-воркером.
+  ## 500Mi мало: при частых сканах SARIF-отчёты копятся и переполняют раздел →
+  ## upload падает с 500 "Failed to save file" (ENOSPC). На k3s local-path лимит
+  ## не энфорсится (раздел = node-диск), но реальные CSI (Ceph/Longhorn/cloud)
+  ## его соблюдают — поэтому держим запас.
   backendStorage:
-    size: 500Mi
-    storageClassName: local-path
+    size: 5Gi
+    storageClassName: ""   # "" = кластерный default storageclass (портируемо); задайте свой для конкретного CSI
+  ## workerStorage — рабочие файлы воркера (рендеры PDF-отчётов и пр.).
   workerStorage:
-    size: 500Mi
-    storageClassName: local-path
+    size: 2Gi
+    storageClassName: ""   # "" = кластерный default storageclass (портируемо); задайте свой для конкретного CSI
   postgresData:
     size: 10Gi
-    storageClassName: local-path
+    storageClassName: ""   # "" = кластерный default storageclass (портируемо); задайте свой для конкретного CSI
 
 ## --- Default project (создаётся seed-admin Job'ом) ---
 ##

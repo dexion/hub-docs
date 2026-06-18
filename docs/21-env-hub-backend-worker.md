@@ -136,7 +136,7 @@
 | `DOMAINSCOPE_RESCAN_API_KEY` | API-key DomainScope rescan | строка (секрет) | `""` | оба |
 | `IAC_SCANNER_RESCAN_URL` | URL iac-scanner для rescan | URL | `""` | оба |
 | `IAC_SCANNER_RESCAN_API_KEY` | API-key iac-scanner rescan | строка (секрет) | `""` | оба |
-| `RESCAN_TIMEOUT_SECONDS` | Таймаут rescan/probe-запроса | целое (сек) | дефолт в коде | оба |
+| `RESCAN_TIMEOUT_SECONDS` | Таймаут rescan/probe-запроса | целое (сек) | `10` | оба |
 | `RESCAN_HOST_ALLOWLIST` | Allowlist хостов rescan (SSRF-гард) | список | `""` | оба |
 
 ## Auto-verify fixes
@@ -168,6 +168,16 @@
 | `CLEANUP_RETENTION_ORPHAN_HOURS` | Удаление orphan-файлов (0 = выкл) | целое ≥0 | `24` | worker |
 | `CLEANUP_DRY_RUN` | Cleanup в режиме dry-run | `true` \| `false` | `false` | worker |
 | `REFRESH_CLEANUP_RETENTION_DAYS` | Хранение refresh-токенов | целое ≥1 | `30` | worker |
+
+## Устаревшие (legacy)
+
+Читаются только чтобы предупредить оператора (WARN в логе) — расписание cleanup
+больше НЕ управляется этими переменными (теперь периодические job'ы River).
+
+| Переменная | Назначение | По умолчанию | Компонент |
+|---|---|---|---|
+| `CLEANUP_SCHEDULE` | Устар.: расписание report-cleanup (игнорируется, только WARN) | `0 2 * * *` | worker |
+| `REFRESH_CLEANUP_SCHEDULE` | Устар.: расписание refresh-token cleanup (игнорируется, только WARN) | `0 3 * * *` | worker |
 
 ## Обязательные переменные (fatal без них)
 

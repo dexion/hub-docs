@@ -62,7 +62,7 @@ gvmd:
 
 ## --- Persistent storage ---
 storage:
-  storageClassName: local-path
+  storageClassName: ""   # "" = кластерный default storageclass (портируемо); задайте свой для конкретного CSI
   pgData:        { size: 5Gi }   ## PostgreSQL data
   gvmdData:      { size: 2Gi }   ## gvmd configs / TLS
   vtData:        { size: 15Gi }  ## ~5GB VT plugins; запас

@@ -152,7 +152,9 @@ spec:
         {{- include "chart.labels" . | nindent 8 }}
     spec:
       accessModes: [ReadWriteOnce]
-      storageClassName: {{ .Values.storage.storageClassName }}
+      {{- with .Values.storage.storageClassName }}
+      storageClassName: {{ . | quote }}
+      {{- end }}
       resources:
         requests:
           storage: {{ .Values.storage.size | quote }}

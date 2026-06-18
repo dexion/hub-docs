@@ -104,10 +104,10 @@ postgres:
     postgresUser: domainscope
   storage:
     size: 5Gi
-    storageClassName: local-path
+    storageClassName: ""   # "" = кластерный default storageclass (портируемо); задайте свой для конкретного CSI
 
 storage:
-  storageClassName: local-path
+  storageClassName: ""   # "" = кластерный default storageclass (портируемо); задайте свой для конкретного CSI
   logs:
     size: 500Mi
 

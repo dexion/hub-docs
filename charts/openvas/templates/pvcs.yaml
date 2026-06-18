@@ -20,7 +20,9 @@ metadata:
     {{- include "chart.labels" $ | nindent 4 }}
 spec:
   accessModes: [ReadWriteOnce]
-  storageClassName: {{ $sc }}
+  {{- with $sc }}
+  storageClassName: {{ . | quote }}
+  {{- end }}
   resources:
     requests:
       storage: {{ $p.size | quote }}

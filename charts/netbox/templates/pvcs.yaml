@@ -8,7 +8,9 @@ metadata:
 spec:
   accessModes:
   - ReadWriteOnce
-  storageClassName: {{ .Values.postgres.storage.storageClassName }}
+  {{- with .Values.postgres.storage.storageClassName }}
+  storageClassName: {{ . | quote }}
+  {{- end }}
   resources:
     requests:
       storage: {{ .Values.postgres.storage.size | quote }}
@@ -23,7 +25,9 @@ metadata:
 spec:
   accessModes:
   - ReadWriteOnce
-  storageClassName: {{ .Values.redis.storage.storageClassName }}
+  {{- with .Values.redis.storage.storageClassName }}
+  storageClassName: {{ . | quote }}
+  {{- end }}
   resources:
     requests:
       storage: {{ .Values.redis.storage.size | quote }}
@@ -38,7 +42,9 @@ metadata:
 spec:
   accessModes:
   - ReadWriteOnce
-  storageClassName: {{ .Values.storage.media.storageClassName }}
+  {{- with .Values.storage.media.storageClassName }}
+  storageClassName: {{ . | quote }}
+  {{- end }}
   resources:
     requests:
       storage: {{ .Values.storage.media.size | quote }}

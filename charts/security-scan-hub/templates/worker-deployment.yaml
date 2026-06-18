@@ -26,6 +26,15 @@ spec:
         runAsUser: 10001
         runAsGroup: 10001
         fsGroup: 10001
+      ## Ждём PostgreSQL перед стартом worker (как backend) — без гонки и
+      ## CrashLoop на старте. Порядок: postgres ready → worker.
+      initContainers:
+      - name: wait-for-postgres
+        image: postgres:15-alpine
+        command: ['sh','-c','until pg_isready -h {{ $dbHost }} -p {{ .Values.worker.worker.env.dbPort | default "5432" }} -U {{ .Values.worker.worker.env.dbUser | default "securityhub" }}; do echo "waiting for postgres {{ $dbHost }}..."; sleep 3; done; echo "postgres ready"']
+        resources:
+          requests: { cpu: "50m", memory: "32Mi" }
+          limits:   { cpu: "200m", memory: "64Mi" }
       containers:
       - name: worker
         image: {{ .Values.worker.worker.image.repository }}:{{ .Values.worker.worker.image.tag | default .Chart.AppVersion }}

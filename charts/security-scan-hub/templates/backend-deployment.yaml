@@ -25,6 +25,17 @@ spec:
         runAsUser: 10001
         runAsGroup: 10001
         fsGroup: 10001
+      ## Ждём готовности PostgreSQL ПЕРЕД стартом backend. Без этого backend
+      ## стартует раньше БД, падает на подключении/миграциях и крэшится несколько
+      ## раз (CrashLoopBackOff) пока БД поднимается — пугает оператора. Порядок:
+      ## postgres ready → backend.
+      initContainers:
+      - name: wait-for-postgres
+        image: postgres:15-alpine
+        command: ['sh','-c','until pg_isready -h {{ $dbHost }} -p {{ .Values.backend.backend.env.dbPort | default "5432" }} -U {{ .Values.backend.backend.env.dbUser | default "securityhub" }}; do echo "waiting for postgres {{ $dbHost }}..."; sleep 3; done; echo "postgres ready"']
+        resources:
+          requests: { cpu: "50m", memory: "32Mi" }
+          limits:   { cpu: "200m", memory: "64Mi" }
       containers:
       - name: backend
         image: {{ .Values.backend.backend.image.repository }}:{{ .Values.backend.backend.image.tag | default .Chart.AppVersion }}

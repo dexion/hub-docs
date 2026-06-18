@@ -62,10 +62,10 @@ grep 127.0.0.53 /etc/resolv.conf && echo "нужен фикс DNS"
 # DNS-резолверы: публичные для внешнего периметра, либо свои внутренние
 DNS_UPSTREAMS="1.1.1.1 8.8.8.8"        # для внутренней инфры: "10.0.0.53 10.0.0.54"
 
-CURRENT=$(kubectl -n kube-system get cm coredns -o jsonpath='{.data.Corefile}')
-PATCHED=$(echo "$CURRENT" | sed "s#forward . /etc/resolv.conf#forward . ${DNS_UPSTREAMS}#")
-PATCH_JSON=$(PATCHED="$PATCHED" python3 -c 'import json,os;print(json.dumps({"data":{"Corefile":os.environ["PATCHED"]}}))')
-kubectl -n kube-system patch cm coredns --type=merge -p "$PATCH_JSON"
+# Чистый shell: берём ConfigMap как YAML, меняем forward-строку, применяем обратно.
+kubectl -n kube-system get cm coredns -o yaml \
+  | sed "s#forward . /etc/resolv.conf#forward . ${DNS_UPSTREAMS}#" \
+  | kubectl -n kube-system replace -f -
 kubectl -n kube-system rollout restart deploy/coredns
 kubectl -n kube-system rollout status deploy/coredns   # дождитесь готовности ДО следующего шага
 ```

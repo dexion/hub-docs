@@ -20,6 +20,41 @@ spec:
         {{- include "chart.selectorLabels" . | nindent 8 }}
     spec:
       initContainers:
+      {{- if .Values.postgres.enabled }}
+      ## Ждём свой PostgreSQL перед стартом DomainScope (порядок: postgres → DS).
+      - name: wait-for-postgres
+        image: postgres:16-alpine
+        command: ['sh','-c','until pg_isready -h {{ include "chart.fullname" . }}-postgres -p 5432 -U {{ .Values.postgres.env.postgresUser | default "domainscope" }}; do echo "waiting for postgres..."; sleep 3; done; echo "postgres ready"']
+        resources:
+          requests: { cpu: "50m", memory: "32Mi" }
+          limits:   { cpu: "200m", memory: "64Mi" }
+      {{- end }}
+      {{- if eq (default "false" .Values.domainscope.env.hubEnabled) "true" }}
+      ## Ждём готовности Hub backend ПЕРЕД стартом DomainScope. Без этого DS на
+      ## быстрых кластерах обгоняет backend, первый scope-fetch падает → активные
+      ## сканеры уходят в fail-closed («hub scope unavailable») и ждут до
+      ## следующего цикла. Порядок запуска: backend ready → DomainScope.
+      - name: wait-for-hub
+        image: alpine:3.19
+        command:
+        - /bin/sh
+        - -c
+        - |
+          ENDPOINT="{{ tpl (.Values.domainscope.env.hubApiEndpoint | default "") . }}"
+          [ -z "$ENDPOINT" ] && { echo "no hub endpoint, skip wait"; exit 0; }
+          apk add --no-cache curl >/dev/null 2>&1
+          echo "Waiting for Hub backend at ${ENDPOINT}/health ..."
+          i=0
+          until curl -fsS -o /dev/null --max-time 5 "${ENDPOINT}/health"; do
+            i=$((i+1))
+            [ $i -ge 60 ] && { echo "Hub backend not ready after 60 tries, proceeding anyway"; exit 0; }
+            echo "  not ready ($i/60), retry in 5s"; sleep 5
+          done
+          echo "Hub backend is ready."
+        resources:
+          requests: { cpu: "50m", memory: "32Mi" }
+          limits:   { cpu: "200m", memory: "64Mi" }
+      {{- end }}
       - name: nuclei-templates-init
         image: alpine:3.19
         command:

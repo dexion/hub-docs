@@ -131,13 +131,13 @@ cronjobs:
 pvc:
   results:
     size: 5Gi
-    storageClassName: local-path
+    storageClassName: ""   # "" = кластерный default storageclass (портируемо); задайте свой для конкретного CSI
     accessModes: [ReadWriteOnce]
   logs:
     ## Создаётся только когда config.logDestination равно "file" или "both".
     enabled: false
     size: 1Gi
-    storageClassName: local-path
+    storageClassName: ""   # "" = кластерный default storageclass (портируемо); задайте свой для конкретного CSI
     accessModes: [ReadWriteOnce]
 
 ## --- Security context уровня Pod ---

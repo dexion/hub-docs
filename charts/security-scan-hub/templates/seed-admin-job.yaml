@@ -40,6 +40,11 @@ metadata:
     "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
 spec:
   ttlSecondsAfterFinished: 600
+  ## Жёсткий потолок: если backend так и не домигрировал (реальный сбой, а не
+  ## медленный старт), Job не висит вечно, а падает — helm-hook отдаёт понятную
+  ## ошибку вместо таймаута. 14m < helm --timeout (15m), чтобы причина была видна.
+  activeDeadlineSeconds: 840
+  backoffLimit: 6
   template:
     metadata:
       labels:

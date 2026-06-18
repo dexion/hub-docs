@@ -43,7 +43,7 @@ resources:
 ## --- Хранилище для сессий, контекстов, политик сканирования ---
 storage:
   size: 10Gi
-  storageClassName: local-path
+  storageClassName: ""   # "" = кластерный default storageclass (портируемо); задайте свой для конкретного CSI
 
 ## --- Service ---
 service:

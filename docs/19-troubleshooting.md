@@ -232,6 +232,91 @@ ORDER BY COUNT(*) DESC;
 
 Сканер не выставляет `level` / `properties.severity` — выставьте поле в SARIF на стороне сканера (см. [`11-integration-sarif.md`](11-integration-sarif.md)).
 
+### `500 Internal Server Error — Failed to save file` при upload
+
+В отличие от 404 (misconfig endpoint), 500 «Failed to save file» означает, что
+запрос **дошёл** до Hub, но backend не смог записать файл отчёта на диск:
+
+- **PVC переполнен (ENOSPC).** Backend пишет отчёты в `STORAGE_PATH`
+  (`/app/storage/reports`), файлы хранятся по retention (`CLEANUP_RETENTION_*`,
+  по умолчанию completed 7 дней). При частых сканах раздел забивается. Увеличьте
+  `pvc.backendStorage.size` (по умолчанию в чарте 5Gi) или уменьшите retention.
+  > На k3s `local-path` лимит PVC не энфорсится (раздел = диск ноды), поэтому
+  > переполнение проявляется только на реальных CSI (Ceph/Longhorn/cloud).
+- **Нет прав на запись.** Backend — non-root (uid 10001). Каталог
+  `/app/storage` должен быть writable для группы fsGroup. Чарт ставит
+  `fsGroup: 10001` — если переопределяли securityContext, проверьте права:
+  `kubectl -n <ns> exec deploy/<rel>-backend -- ls -la /app/storage`.
+
+Проверка занятости:
+
+```bash
+kubectl -n <ns> exec deploy/<rel>-backend -- df -h /app/storage
+```
+
+## Развёртывание на k3s (storage / DNS / порядок запуска)
+
+### PVC висит в `Pending`, поды не стартуют
+
+```bash
+kubectl -n <ns> get pvc
+kubectl -n <ns> describe pvc <name>   # ищите "no persistent volumes available" / "storageclass not found"
+```
+
+- **`storageclass not found`** — в чарте указан несуществующий `storageClassName`.
+  Чарты по умолчанию оставляют его **пустым** (`""`) → кластер берёт свой
+  default storageclass (работает на k3s, облаках). Если задавали явно — проверьте
+  `kubectl get storageclass` и впишите существующий.
+- Нет default storageclass в кластере — задайте `storageClassName` для всех PVC
+  явно (values каждого чарта) либо пометьте storageclass как default.
+
+### Сканер не находит цели / нет находок (DNS из подов)
+
+Симптом: в логах DomainScope `ip resolve failed ... no such host`, discovery
+завершается с `scannable_ips:0`.
+
+Причина: нода использует systemd-resolved, `/etc/resolv.conf` указывает на stub
+`127.0.0.53`, недостижимый из подов. CoreDNS по умолчанию форвардит на него.
+
+```bash
+kubectl -n kube-system get cm coredns -o jsonpath='{.data.Corefile}' | grep forward
+# плохо: forward . /etc/resolv.conf  →  должно быть: forward . 1.1.1.1 8.8.8.8
+```
+
+`install.sh` чинит это автоматически (флаг `--dns "<ip...>"` для своих
+резолверов, `--no-dns-fix` чтобы не трогать). Вручную — см.
+[ручную установку](03b-deploy-manual.md), шаг «Фикс DNS».
+
+> Для сканирования **внутренней** инфраструктуры (split-horizon DNS) укажите
+> внутренние резолверы: `--dns "10.0.0.53 10.0.0.54"`.
+
+### `hub scope unavailable, fail-closed` — сканер пропускает циклы
+
+DomainScope не смог получить scope из Hub Scope API и (безопасно) пропустил скан.
+Обычно это **гонка старта**: DomainScope поднялся раньше готовности Hub backend.
+
+Чарт ставит init-контейнер `wait-for-hub`, который ждёт `/health` backend перед
+стартом DomainScope — на штатной установке гонки нет. Если видите это **после**
+старта — проверьте доступность backend и валидность SA-токена:
+
+```bash
+kubectl -n <ns> logs deploy/<rel>-domainscope-domainscope -c domainscope | grep -i scope
+# scope_unavail должно стать 0 после готовности backend
+```
+
+### Backend/worker в CrashLoop в первые минуты
+
+Чарт ставит init-контейнер `wait-for-postgres` (backend/worker ждут БД перед
+стартом). Если CrashLoop сохраняется после готовности postgres — смотрите логи
+backend (миграции, секреты): `kubectl -n <ns> logs deploy/<rel>-backend`.
+
+### `post-install hooks failed` при `helm install`
+
+seed-admin Job (создаёт admin + default-проект) ждёт, пока backend домигрирует
+БД. На медленном старте (холодный pull образов, эмуляция amd64 на ARM) дефолтных
+5 мин helm не хватает. `install.sh` ставит `--timeout 15m`; для ручного helm
+добавьте `--timeout 15m` (или `HELM_TIMEOUT=30m ./install.sh`).
+
 ## LLM / Sandbox
 
 ### LLM-jobs не выполняются

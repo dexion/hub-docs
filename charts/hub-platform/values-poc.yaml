@@ -170,13 +170,17 @@ domainscope:
     env:
       ## OpenVAS выключен в POC → DomainScope не должен пытаться ходить к gvmd.
       openvasEnabled: "false"
-      ## Короткие циклы для ознакомления: первые находки появляются за минуты,
-      ## а не часы. Также self-heal, если первый discovery-цикл стартовал до
-      ## готовности DNS (CoreDNS) — повтор через 10 мин, а не через дефолтные 6 ч.
-      ## PROD: верните дефолты (discovery 21600, portscan 7200), чтобы не нагружать
-      ## цель и сеть частыми сканами.
-      timeLoopDiscovery: "600"
-      timeLoopPortscan: "600"
+      ## Минимальные задержки между циклами для ознакомления: пауза = время ОЖИДАНИЯ
+      ## после завершения предыдущего цикла до старта следующего. 60с — быстрая
+      ## обратная связь + self-heal, если первый цикл стартовал до готовности
+      ## зависимостей (DNS/Hub scope).
+      ## PROD: верните дефолты (discovery 21600=6ч, portscan 7200=2ч, openvas 86400,
+      ## zap rescan 86400), иначе будете молотить цель и сеть непрерывно.
+      timeLoop: "60"
+      timeLoopDiscovery: "60"
+      timeLoopPortscan: "60"
+      timeLoopOpenvas: "60"
+      zapRescanPeriod: "60"
       ## connect-скан (nmap -sT): amd64-образ DomainScope под qemu-эмуляцией на
       ## arm64-ноде НЕ может открыть raw-сокеты → SYN-скан падает
       ## (pcap_open_live() failed) → порты не находятся → нет находок.

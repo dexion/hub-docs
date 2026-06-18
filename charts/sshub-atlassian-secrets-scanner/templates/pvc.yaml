@@ -12,7 +12,9 @@ spec:
   resources:
     requests:
       storage: {{ .Values.pvc.results.size }}
-  storageClassName: {{ .Values.pvc.results.storageClassName | quote }}
+  {{- with .Values.pvc.results.storageClassName }}
+  storageClassName: {{ . | quote }}
+  {{- end }}
 {{- if .Values.pvc.logs.enabled }}
 ---
 apiVersion: v1
@@ -29,5 +31,7 @@ spec:
   resources:
     requests:
       storage: {{ .Values.pvc.logs.size }}
-  storageClassName: {{ .Values.pvc.logs.storageClassName | quote }}
+  {{- with .Values.pvc.logs.storageClassName }}
+  storageClassName: {{ . | quote }}
+  {{- end }}
 {{- end }}

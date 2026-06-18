@@ -8,7 +8,9 @@ metadata:
 spec:
   accessModes:
   - ReadWriteOnce
-  storageClassName: {{ .Values.pvc.backendStorage.storageClassName }}
+  {{- with .Values.pvc.backendStorage.storageClassName }}
+  storageClassName: {{ . }}
+  {{- end }}
   resources:
     requests:
       storage: {{ .Values.pvc.backendStorage.size | quote }}
@@ -23,7 +25,9 @@ metadata:
 spec:
   accessModes:
   - ReadWriteOnce
-  storageClassName: {{ .Values.pvc.backendStorage.storageClassName }}
+  {{- with .Values.pvc.backendStorage.storageClassName }}
+  storageClassName: {{ . }}
+  {{- end }}
   resources:
     requests:
       storage: {{ .Values.pvc.backendStorage.size | quote }}
@@ -38,7 +42,9 @@ metadata:
 spec:
   accessModes:
   - ReadWriteOnce
-  storageClassName: {{ .Values.pvc.workerStorage.storageClassName }}
+  {{- with .Values.pvc.workerStorage.storageClassName }}
+  storageClassName: {{ . }}
+  {{- end }}
   resources:
     requests:
       storage: {{ .Values.pvc.workerStorage.size | quote }}
@@ -53,7 +59,9 @@ metadata:
 spec:
   accessModes:
   - ReadWriteOnce
-  storageClassName: {{ .Values.pvc.postgresData.storageClassName }}
+  {{- with .Values.pvc.postgresData.storageClassName }}
+  storageClassName: {{ . }}
+  {{- end }}
   resources:
     requests:
       storage: {{ .Values.pvc.postgresData.size | quote }}
