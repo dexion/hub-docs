@@ -23,7 +23,13 @@ secrets:
 
 image:
   repository: zaproxy/zap-stable
+  ## ZAP не публикует версионных тегов — пинимся на digest для воспроизводимости
+  ## (фиксирует конкретный образ, не плавающий latest). Обновлять при апгрейде ZAP:
+  ##   docker buildx imagetools inspect zaproxy/zap-stable:latest
+  ## digest имеет приоритет над tag (см. statefulset.yaml). Сбросить на latest:
+  ## задайте digest: "" .
   tag: latest
+  digest: "sha256:7c2f8afc893e4e4000be8ad3fd22013fc36e5cce59359349f5a2d45626e2ccb9"
   pullPolicy: IfNotPresent
 
 ## Порт прослушивания daemon ZAP (внутри контейнера; service пробрасывает тот же порт).

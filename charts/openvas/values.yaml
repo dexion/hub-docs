@@ -35,8 +35,14 @@ secrets:
 ## --- Образы Greenbone Community ---
 ##
 ## Версия Community Edition сейчас 22.4 → feed release 24.10.
-## :stable теги — для long-running контейнеров (gvmd, gsad, ospd-openvas, redis).
-## :community теги — для feed-data контейнеров (vulnerability-tests и т.п.).
+## Политика версий greenbone community (намеренно НЕ пиним на digest):
+##   :stable    — движки (gvmd, gsad, ospd-openvas, scanner, redis, pg-gvm).
+##                greenbone community не публикует версионных тегов; :stable —
+##                единственный поддерживаемый канал для движков.
+##   :community — feed-data (vulnerability-tests, scap/cert/notus и т.п.). Это
+##                ДАННЫЕ уязвимостей — должны быть свежими, пин убил бы смысл.
+## Для строгой воспроизводимости (air-gapped) зеркальте образы в свой реестр и
+## пиньте по digest там; иначе оставьте как есть.
 images:
   pgGvm: registry.community.greenbone.net/community/pg-gvm:stable
   gvmd: registry.community.greenbone.net/community/gvmd:stable
