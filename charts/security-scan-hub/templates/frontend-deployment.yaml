@@ -17,11 +17,15 @@ spec:
         app.kubernetes.io/component: frontend
         {{- include "chart.selectorLabels" . | nindent 8 }}
     spec:
+      ## Pod securityContext конфигурируется через values
+      ## (frontend.frontend.podSecurityContext). По умолчанию — nginx-uid 101.
+      ## ВНИМАНИЕ: entrypoint.sh инжектит env в бандл через `sed -i`, что требует
+      ## прав на запись в /usr/share/nginx/html. Если образ копирует бандл как
+      ## root:root (644), запуск под non-root uid 101 ломает инъекцию
+      ## («sed: can't create temp file ... Permission denied»). В таком случае
+      ## переопределите podSecurityContext (например, runAsUser: 0) — см. values-poc.
       securityContext:
-        runAsNonRoot: true
-        runAsUser: 101
-        runAsGroup: 101
-        fsGroup: 101
+        {{- toYaml .Values.frontend.frontend.podSecurityContext | nindent 8 }}
       containers:
       - name: frontend
         image: {{ .Values.frontend.frontend.image.repository }}:{{ .Values.frontend.frontend.image.tag | default .Chart.AppVersion }}

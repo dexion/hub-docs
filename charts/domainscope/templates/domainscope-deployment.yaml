@@ -147,6 +147,14 @@ spec:
           value: {{ .Values.domainscope.env.targetPorts | quote }}
         - name: DOMAINSCOPE_TIME_LOOP
           value: {{ .Values.domainscope.env.timeLoop | quote }}
+        {{- if .Values.domainscope.env.timeLoopDiscovery }}
+        - name: DOMAINSCOPE_TIME_LOOP_DISCOVERY
+          value: {{ .Values.domainscope.env.timeLoopDiscovery | quote }}
+        {{- end }}
+        {{- if .Values.domainscope.env.timeLoopPortscan }}
+        - name: DOMAINSCOPE_TIME_LOOP_PORTSCAN
+          value: {{ .Values.domainscope.env.timeLoopPortscan | quote }}
+        {{- end }}
         - name: DOMAINSCOPE_DSN
           valueFrom:
             secretKeyRef:
@@ -155,6 +163,10 @@ spec:
         {{- if .Values.domainscope.env.fingerprintTimeout }}
         - name: DOMAINSCOPE_FINGERPRINT_TIMEOUT
           value: {{ .Values.domainscope.env.fingerprintTimeout | quote }}
+        {{- end }}
+        {{- if .Values.domainscope.env.scanType }}
+        - name: DOMAINSCOPE_SCANNER_SCAN_TYPE
+          value: {{ .Values.domainscope.env.scanType | quote }}
         {{- end }}
         - name: DOMAINSCOPE_SARIF_ENABLED
           value: {{ .Values.domainscope.env.sarifEnabled | quote }}

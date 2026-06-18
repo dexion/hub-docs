@@ -28,8 +28,11 @@ domainscope:
   tolerations: []
   topologySpreadConstraints: []
   image:
+    # Пиним конкретную версию вместо плавающего :latest — воспроизводимые
+    # установки. Версия = internal/pkg/utils/version.txt в репо DomainScope;
+    # CI publish (release) пушит dexionius/domain-scope:<version> + :latest.
     repository: dexionius/domain-scope
-    tag: latest
+    tag: "0.26"
   resources:
     requests:
       cpu: "500m"
@@ -71,8 +74,18 @@ domainscope:
     zapRescanPeriod: "86400"
     # Тайминги
     timeLoop: "7200"
+    # Интервалы циклов, сек. Пусто → дефолты бинаря (discovery 21600 = 6ч,
+    # portscan 7200 = 2ч). Для ознакомления переопределяются в values-poc.yaml.
+    timeLoopDiscovery: ""
+    timeLoopPortscan: ""
     timeLoopOpenvas: "86400"
     fingerprintTimeout: "10"
+    # Тип nmap-скана портов: "" (=syn, default) | "syn" | "connect".
+    #   syn     — TCP SYN, быстрый, требует raw-сокетов (root/CAP_NET_RAW).
+    #   connect — TCP connect, без привилегий. Нужен там, где raw-сокеты
+    #             недоступны: rootless-поды, qemu-эмуляция (amd64-образ на
+    #             arm64-ноде), ограниченный seccomp. Пусто → поведение по умолчанию.
+    scanType: ""
     # Hub Scope API: domainscope забирает scope (домены для сканирования) из hub.
     # Подключается umbrella-чартом автоматически; в standalone-установке задайте вручную:
     #   --set domainscope.domainscope.env.hubEnabled=true

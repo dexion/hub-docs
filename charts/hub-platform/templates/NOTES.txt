@@ -20,7 +20,7 @@
   AUTH_MODE=SSO — заходи через Keycloak ({{ .Values.hub.backend.backend.env.keycloakUrl }})
 {{- end }}
 
-  OpenVAS admin / ZAP API key — fetch with:
+  Секреты компонентов — fetch with:
 
     kubectl -n {{ .Release.Namespace }} get secret {{ .Release.Name }}-hub-secrets       -o jsonpath='{.data.dbPassword}'        | base64 -d  # hub DB pwd
 {{- if .Values.openvas.enabled }}

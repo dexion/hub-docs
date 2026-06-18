@@ -158,6 +158,15 @@ frontend:
       repository: dexionius/sshub-frontend
       tag: latest
       pullPolicy: IfNotPresent
+    ## Pod securityContext. По умолчанию — nginx-uid 101 (non-root).
+    ## Если образ копирует бандл как root:root, runtime-инъекция env через
+    ## `sed -i` в entrypoint.sh ломается под non-root — тогда переопределите
+    ## (например, runAsUser: 0). Подробнее — комментарий в frontend-deployment.yaml.
+    podSecurityContext:
+      runAsNonRoot: true
+      runAsUser: 101
+      runAsGroup: 101
+      fsGroup: 101
     resources:
       requests:
         cpu: "50m"

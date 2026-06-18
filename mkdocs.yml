@@ -60,11 +60,16 @@ nav:
       - Обзор архитектуры: 01-overview.md
       - Системные требования: 02-prerequisites.md
   - Развёртывание:
-      - Быстрый старт на k3s: 03a-quickstart-k3s.md
+      - Быстрый старт на k3s (install.sh): 03a-quickstart-k3s.md
+      - Ручная установка на k3s (по шагам): 03b-deploy-manual.md
       - Docker Compose: 03-deploy-compose.md
-      - Kubernetes / Helm: 04-deploy-kubernetes.md
+      - Kubernetes / Helm (production): 04-deploy-kubernetes.md
   - Конфигурация:
-      - Переменные окружения: 05-configuration.md
+      - Обзор и соглашения: 05-configuration.md
+      - Hub (backend + worker): 21-env-hub-backend-worker.md
+      - Frontend: 22-env-frontend.md
+      - DomainScope: 23-env-domainscope.md
+      - Сканеры (IaC, OpenVAS, ZAP): 24-env-scanners.md
   - Интеграции:
       - Keycloak / SSO: 06-integration-keycloak.md
       - Jira: 07-integration-jira.md

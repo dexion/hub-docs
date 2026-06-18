@@ -13,9 +13,21 @@
 #   sudo ./install.sh --domain mycorp.io --tls letsencrypt --le-email me@x.io
 #   sudo ./install.sh --ingress nginx --tls selfsigned
 #   sudo ./install.sh --wg-values ./wg-values.yaml           # WG egress
+#   sudo ./install.sh --domain hub.poc.local \                # POC-стенд
+#        --values charts/hub-platform/values-poc.yaml
+#   sudo ./install.sh --dns "10.0.0.53 10.0.0.54"            # свой DNS (внутр. инфра)
+#   sudo ./install.sh --no-dns-fix                           # не трогать CoreDNS
+#
+# Флаги DNS:
+#   --dns "<ip> [ip...]"  DNS-резолверы для CoreDNS (по умолчанию 1.1.1.1 8.8.8.8).
+#                         Задайте свои внутренние резолверы, если сканируете
+#                         ВНУТРЕННЮЮ инфраструктуру (split-horizon, корпоративные
+#                         зоны), а не только публичный периметр.
+#   --no-dns-fix          Не патчить CoreDNS (если DNS в кластере уже настроен).
 #
 # Через env-vars (как альтернатива флагам):
-#   DOMAIN, TLS_MODE, LE_EMAIL, INGRESS_CLASS, RELEASE, NAMESPACE, WG_VALUES
+#   DOMAIN, TLS_MODE, LE_EMAIL, INGRESS_CLASS, RELEASE, NAMESPACE, WG_VALUES,
+#   DNS_UPSTREAMS, DNS_FIX
 
 set -euo pipefail
 
@@ -29,6 +41,10 @@ NAMESPACE="${NAMESPACE:-hub}"
 WG_VALUES="${WG_VALUES:-}"
 SKIP_K3S="${SKIP_K3S:-0}"
 SKIP_CERT_MANAGER="${SKIP_CERT_MANAGER:-0}"
+# Доп. values-файлы (повторяемый флаг -f/--values). Применяются ПЕРЕД --set,
+# поэтому операторские --set (domain/tls/ingress) имеют приоритет над файлом.
+# Пример (POC): --values charts/hub-platform/values-poc.yaml
+EXTRA_VALUES=()
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -38,7 +54,10 @@ while [[ $# -gt 0 ]]; do
     --ingress)       INGRESS_CLASS="$2"; shift 2 ;;
     --release)       RELEASE="$2"; shift 2 ;;
     --namespace|-n)  NAMESPACE="$2"; shift 2 ;;
+    --values|-f)     EXTRA_VALUES+=("$2"); shift 2 ;;
     --wg-values)     WG_VALUES="$2"; shift 2 ;;
+    --dns)           DNS_UPSTREAMS="$2"; shift 2 ;;
+    --no-dns-fix)    DNS_FIX=0; shift ;;
     --skip-k3s)      SKIP_K3S=1; shift ;;
     --skip-cert-manager) SKIP_CERT_MANAGER=1; shift ;;
     -h|--help)
@@ -88,6 +107,44 @@ for i in {1..60}; do
   sleep 2
 done
 kubectl get nodes
+
+# -----------------------------------------------------------------------------
+# 1.5. DNS-фикс для CoreDNS (k3s + systemd-resolved)
+# -----------------------------------------------------------------------------
+# Типовой баг: нода использует systemd-resolved, /etc/resolv.conf указывает на
+# stub 127.0.0.53. CoreDNS по умолчанию форвардит «. /etc/resolv.conf» → на этот
+# stub, недостижимый из подов → поды НЕ резолвят внешние домены (сканеры не
+# находят цели, образы из публичных реестров могут не тянуться). Чиним: форвардим
+# CoreDNS на надёжный публичный DNS. Идемпотентно. Отключить: DNS_FIX=0.
+#
+# ВАЖНО: форвардим на ПУБЛИЧНЫЙ DNS (1.1.1.1 8.8.8.8), а НЕ на upstream ноды.
+# Upstream ноды часто бывает captive/wildcard-резолвером (DNS NAT-гипервизора,
+# corporate-резолвер с поиском по своему домену): он отдаёт мусорные A-записи на
+# несуществующие имена (*.localdomain → случайный IP) и может ломать резолв
+# публичных целей сканера. Сканер по природе резолвит ВНЕШНИЕ домены, поэтому
+# публичный DNS — правильный дефолт. Если нужен внутренний DNS (split-horizon,
+# air-gapped) — задайте свой: DNS_UPSTREAMS="10.0.0.53 10.0.0.54".
+DNS_FIX="${DNS_FIX:-1}"
+DNS_UPSTREAMS="${DNS_UPSTREAMS:-1.1.1.1 8.8.8.8}"
+if [[ "$DNS_FIX" -eq 1 ]]; then
+  if grep -q '127.0.0.53' /etc/resolv.conf 2>/dev/null; then
+    UPSTREAMS="$DNS_UPSTREAMS"
+    CURRENT=$(kubectl -n kube-system get cm coredns -o jsonpath='{.data.Corefile}' 2>/dev/null || true)
+    if echo "$CURRENT" | grep -q 'forward . /etc/resolv.conf'; then
+      log "Чиню CoreDNS: forward → ${UPSTREAMS}(stub 127.0.0.53 недостижим из подов)..."
+      PATCHED=$(echo "$CURRENT" | sed "s#forward \. /etc/resolv.conf#forward . ${UPSTREAMS}#")
+      PATCH_JSON=$(PATCHED="$PATCHED" python3 -c \
+        'import json,os;print(json.dumps({"data":{"Corefile":os.environ["PATCHED"]}}))')
+      kubectl -n kube-system patch cm coredns --type=merge -p "$PATCH_JSON"
+      kubectl -n kube-system rollout restart deploy/coredns >/dev/null 2>&1 || true
+      # Дожидаемся перезапуска CoreDNS ДО установки приложения. Иначе сканер
+      # стартует, пока CoreDNS ещё перезагружается, первый discovery-цикл не
+      # резолвит домены (0 целей) и повторяет попытку только через
+      # TIME_LOOP_DISCOVERY (по умолчанию 6 ч) — пользователь видит «нет находок».
+      kubectl -n kube-system rollout status deploy/coredns --timeout=90s >/dev/null 2>&1 || true
+    fi
+  fi
+fi
 
 # -----------------------------------------------------------------------------
 # 2. helm
@@ -149,6 +206,15 @@ HELM_ARGS=(
   --set "zap.tls.mode=${TLS_MODE}"
 )
 
+# Доп. values-файлы (-f/--values). helm: --set всегда приоритетнее -f, поэтому
+# операторские --set выше (domain/tls/ingress) переопределяют значения из файла.
+for _vf in "${EXTRA_VALUES[@]:-}"; do
+  [[ -n "$_vf" ]] || continue
+  [[ -f "$_vf" ]] || { echo "values-файл не найден: $_vf" >&2; exit 1; }
+  log "Подключаю values-файл: ${_vf}"
+  HELM_ARGS+=(-f "$_vf")
+done
+
 if [[ -n "$WG_VALUES" && -f "$WG_VALUES" ]]; then
   log "Подключаю WireGuard egress из ${WG_VALUES}..."
   HELM_ARGS+=(
@@ -182,6 +248,17 @@ SCHEME="http"
 # а не оставались литералами в heredoc-выводе).
 B=$'\033[1m'; G=$'\033[1;32m'; Y=$'\033[1;33m'; R=$'\033[1;31m'; C=$'\033[1;36m'; N=$'\033[0m'
 
+# OpenVAS может быть отключён (например, в values-poc openvas.enabled=false).
+# Печатаем OpenVAS-секции summary ТОЛЬКО если openvas реально развёрнут —
+# иначе пользователь видит ссылку на несуществующий UI и пароль <not-yet>.
+OPENVAS_SECTION=""; OPENVAS_FEED_SECTION=""
+if kubectl -n "${NAMESPACE}" get secret "${RELEASE}-openvas-secrets" >/dev/null 2>&1; then
+  OPENVAS_SECTION=$(printf '%s▶ OpenVAS UI%s     →  %s%s://openvas.%s/%s\n   Логин:   %sadmin%s\n   Пароль:  %s%s%s\n' \
+    "$G" "$N" "$C" "$SCHEME" "$DOMAIN" "$N" "$B" "$N" "$B" "$OPENVAS_PWD" "$N")
+  OPENVAS_FEED_SECTION=$(printf '%s⏳  OpenVAS feed init%s занимает ~10–30 минут (~5 GB). До завершения\n    OpenVAS-сканы не найдут уязвимостей. Прогресс:\n      kubectl -n %s get pod -l app.kubernetes.io/component=openvas\n' \
+    "$Y" "$N" "$NAMESPACE")
+fi
+
 cat <<EOF
 
 ╔═══════════════════════════════════════════════════════════════════════╗
@@ -192,10 +269,7 @@ ${G}▶ Hub Web UI${N}     →  ${C}${SCHEME}://${DOMAIN}/${N}
    Логин:   ${B}admin@localhost.local${N}
    Пароль:  ${B}${HUB_ADMIN_PWD}${N}
 
-${G}▶ OpenVAS UI${N}     →  ${C}${SCHEME}://openvas.${DOMAIN}/${N}
-   Логин:   ${B}admin${N}
-   Пароль:  ${B}${OPENVAS_PWD}${N}
-
+${OPENVAS_SECTION}
 ${G}▶ Service Tokens${N}
    Hub default SA token:   ${B}${SA_TOKEN}${N}
    ZAP API key:            ${B}${ZAP_KEY}${N}
@@ -207,11 +281,7 @@ ${R}⚠  ВНИМАНИЕ${N}: пароли и токены сгенериров
    Смените пароль admin@localhost.local в Hub UI ${B}СРАЗУ${N}.
 ${R}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${N}
 
-${Y}⏳  OpenVAS feed init${N} занимает ~10–30 минут (~5 GB). До завершения
-    OpenVAS-сканы не найдут уязвимостей. Прогресс:
-      kubectl -n ${NAMESPACE} get pod -l app.kubernetes.io/component=openvas
-      kubectl -n ${NAMESPACE} describe pod -l app.kubernetes.io/component=openvas | grep -A1 'Init Container'
-
+${OPENVAS_FEED_SECTION}
 ${Y}⏳  Default project${N}: автосоздан проект «${B}$(kubectl -n "${NAMESPACE}" get secret "${RELEASE}-hub-secrets" -o jsonpath='{.data.defaultProjectId}' 2>/dev/null | base64 -d 2>/dev/null || echo Default)${N}»
     с начальным scope, который можно поменять в hub UI или через helm:
       helm upgrade ${RELEASE} <chart> --reuse-values --set global.defaultProject.scope=foo.com,bar.com

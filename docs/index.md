@@ -15,6 +15,8 @@
 
 ### Развёртывание
 
+- [Быстрый старт на k3s (install.sh)](03a-quickstart-k3s.md) — от голой VM до рабочего стенда одной командой
+- [Ручная установка на k3s (по шагам)](03b-deploy-manual.md) — то же вручную, без скрипта, для контроля каждого шага
 - [03. Docker Compose](03-deploy-compose.md) — самый быстрый способ, рекомендуется для пилотов и небольших инсталляций
 - [04. Kubernetes / Helm](04-deploy-kubernetes.md) — продакшен через umbrella-чарт `hub-platform` (опц. ArgoCD + Vault)
 
