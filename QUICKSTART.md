@@ -258,7 +258,7 @@ helm -n hub uninstall hub
 - [ ] Бэкапы PVC: hub-postgres, hub-openvas-vt-data + gvmd-data
 - [ ] Поменять пароль `admin@localhost.local` сразу после первого входа
 - [ ] (опц.) `--ingress nginx` если нужны его расширенные фичи
-- [ ] (опц.) `AUTH_MODE=SSO` + Keycloak/OIDC вместо LOCAL
+- [ ] (опц.) `AUTH_MODE=SSO` + Keycloak, Azure AD (Entra ID) или любой OIDC-провайдер (`SSO_PROVIDERS`, `OIDC_<NAME>_*`) — см. [06-integration-keycloak.md](docs/06-integration-keycloak.md)
 - [ ] (опц.) Внешний managed PostgreSQL вместо in-cluster (`hub.postgres.enabled=false` + DSN в secrets)
 
 ## Диагностика проблем

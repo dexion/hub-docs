@@ -71,7 +71,7 @@ nav:
       - DomainScope: 23-env-domainscope.md
       - Сканеры (IaC, OpenVAS, ZAP): 24-env-scanners.md
   - Интеграции:
-      - Keycloak / SSO: 06-integration-keycloak.md
+      - SSO (Keycloak, Azure AD, OIDC): 06-integration-keycloak.md
       - Jira: 07-integration-jira.md
       - Mattermost и Telegram: 08-integration-notifications.md
       - NetBox: 09-integration-netbox.md

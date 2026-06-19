@@ -1,24 +1,77 @@
-# 06. Интеграция с Keycloak (SSO)
+# 06. Интеграция с SSO (Keycloak, Azure AD, любой OIDC)
 
-Hub использует Keycloak как OIDC-провайдер. Поддерживается два режима:
+Hub поддерживает **подключаемые OIDC-провайдеры**. Keycloak остаётся основным и настраивается через существующие `KEYCLOAK_*` переменные — действующие инсталляции без изменений продолжают работать. Дополнительно можно подключить Azure AD (Entra ID), корпоративный IdP или любой другой OIDC-провайдер через универсальный механизм `OIDC_<NAME>_*`.
 
-1. **SSO-логин в UI** — пользователь входит через Keycloak realm, Hub выпускает свой внутренний JWT
+Поддерживается два режима входа:
+
+1. **SSO-логин в UI** — пользователь входит через OIDC-провайдер, Hub выпускает свой внутренний JWT
 2. **Transparent SSO** — внешнее приложение проксирует запросы в Hub с собственным JWT того же Keycloak realm; Hub валидирует и принимает без повторного логина
 
-## Архитектура
+## Мульти-провайдерный SSO
+
+### Переменная `SSO_PROVIDERS`
+
+```ini
+SSO_PROVIDERS=keycloak           # по умолчанию — только Keycloak (обратная совместимость)
+SSO_PROVIDERS=keycloak,azure     # Keycloak + Azure AD
+SSO_PROVIDERS=keycloak,okta      # Keycloak + Okta
+```
+
+Каждый провайдер из списка отображается отдельной кнопкой на странице логина Hub. Имя в списке — идентификатор провайдера (произвольная строка нижнего регистра).
+
+### Маршруты логина
+
+| Маршрут | Провайдер |
+|---|---|
+| `/api/v1/auth/sso/<provider>/login` | Любой провайдер по имени |
+| `/api/v1/auth/keycloak/login` | Legacy-маршрут Keycloak (работает без изменений) |
+
+**Redirect URI**, который нужно зарегистрировать в каждом IdP:
+
+```
+{FRONTEND_URL}/auth/callback
+```
+
+### Модель `OIDC_<NAME>_*` (generic OIDC)
+
+Для каждого дополнительного провайдера задаётся набор переменных с префиксом `OIDC_<UPPER(NAME)>_`, где `NAME` — имя провайдера в `SSO_PROVIDERS` в верхнем регистре.
+
+| Переменная | Назначение | Обязательна | По умолчанию |
+|---|---|---|---|
+| `OIDC_<NAME>_DISPLAY_NAME` | Метка на кнопке входа | Нет | имя провайдера |
+| `OIDC_<NAME>_DISCOVERY_URL` | URL OIDC well-known (`/.well-known/openid-configuration`) | Да (или задайте endpoint-overrides) | — |
+| `OIDC_<NAME>_CLIENT_ID` | Client ID в IdP | Да | — |
+| `OIDC_<NAME>_CLIENT_SECRET` | Client Secret | Да | — |
+| `OIDC_<NAME>_SCOPES` | Запрашиваемые scopes (через пробел) | Нет | `openid profile email` |
+| `OIDC_<NAME>_AUTO_PROVISION` | Автосоздание пользователей при первом входе | Нет | `true` |
+| `OIDC_<NAME>_AUTH_URL` | Переопределение authorization endpoint | Нет | из discovery |
+| `OIDC_<NAME>_TOKEN_URL` | Переопределение token endpoint | Нет | из discovery |
+| `OIDC_<NAME>_JWKS_URL` | Переопределение jwks_uri | Нет | из discovery |
+| `OIDC_<NAME>_ISSUER` | Переопределение issuer | Нет | из discovery |
+| `OIDC_<NAME>_END_SESSION_URL` | Переопределение end_session_endpoint | Нет | из discovery |
+
+**Разрешение endpoints**: явный override > discovery document > ошибка при старте.
+
+### Идентификация пользователей
+
+- Пользователь сопоставляется по паре `(provider, subject)` (поле `sub` из JWT).
+- При первом входе нового пользователя: Hub ищет существующий аккаунт по **верифицированному email** (`email_verified=true`) и привязывает к нему; если аккаунта нет и `AUTO_PROVISION=true` — создаёт нового со статусом **active**, ролью **viewer** (расширить доступ к продуктам/проектам может администратор через UI Hub → Admin → Users).
+- Маппинг ролей из групп IdP **не поддерживается** (роли управляются внутри Hub).
+
+## Архитектура (один провайдер)
 
 ```
                     ┌───────────────┐
                     │   Browser     │
                     └───────┬───────┘
-                            │ 1. /auth/keycloak/login
+                            │ 1. /auth/sso/<provider>/login
                             ▼
                   ┌─────────────────┐
-                  │  Hub backend    │ ── 2. redirect to KC ──▶  ┌──────────┐
-                  │                 │                           │ Keycloak │
-                  │                 │ ◀── 3. code via redirect ─│ realm    │
-                  │                 │                           └──────────┘
-                  │                 │ ── 4. exchange code → KC tokens
+                  │  Hub backend    │ ── 2. redirect to IdP ──▶  ┌──────────┐
+                  │                 │                            │ OIDC IdP │
+                  │                 │ ◀── 3. code via redirect ──│ (KC/AAD) │
+                  │                 │                            └──────────┘
+                  │                 │ ── 4. exchange code → tokens
                   │                 │ ── 5. create/update user in DB
                   │                 │ ── 6. issue internal JWT
                   └─────────────────┘
@@ -196,6 +249,52 @@ ATOM_IDP_BASE_URL=https://atom-idp.example.com
 - Без email юзер не создаётся (логируется warning)
 
 При `KC_AUTO_PROVISION=false`: внешние JWT принимаются только для уже существующих юзеров.
+
+## Настройка Azure AD (Entra ID)
+
+Azure AD — обычный OIDC-провайдер. Имя провайдера в примере — `azure`.
+
+### 1. Регистрация приложения в Azure
+
+1. Azure Portal → **Azure Active Directory** → **App registrations** → **New registration**
+2. Название — произвольное (например, `security-hub`)
+3. **Supported account types**: выберите тип по политике организации (обычно *Accounts in this organizational directory only*)
+4. **Redirect URI**: тип `Web`, значение:
+   ```
+   https://hub.example.com/auth/callback
+   ```
+5. После создания скопируйте **Application (client) ID** и **Directory (tenant) ID**
+6. **Certificates & secrets** → **New client secret** → скопируйте значение (показывается один раз)
+7. **API permissions**: убедитесь, что есть `openid`, `profile`, `email` (Microsoft Graph — delegated)
+
+### 2. Hub env vars
+
+```ini
+AUTH_MODE=SSO
+SSO_PROVIDERS=keycloak,azure
+
+# Azure AD
+OIDC_AZURE_DISPLAY_NAME=Azure AD
+OIDC_AZURE_DISCOVERY_URL=https://login.microsoftonline.com/<tenant-id>/v2.0/.well-known/openid-configuration
+OIDC_AZURE_CLIENT_ID=<application-client-id>
+OIDC_AZURE_CLIENT_SECRET=<client-secret-value>
+# OIDC_AZURE_SCOPES=openid profile email   # по умолчанию, задавать не нужно
+# OIDC_AZURE_AUTO_PROVISION=true           # по умолчанию true
+```
+
+Замените `<tenant-id>` на Directory (tenant) ID из Azure Portal.
+
+### 3. Проверка
+
+```bash
+# Discovery должен быть доступен из backend
+curl -fs "https://login.microsoftonline.com/<tenant-id>/v2.0/.well-known/openid-configuration" | jq .issuer
+
+# Кнопка «Azure AD» появится на странице логина Hub
+curl -s https://hub.example.com/api/v1/auth/config | jq .providers
+```
+
+---
 
 ## Откат к LOCAL-режиму
 
