@@ -11,6 +11,7 @@
 | Переменная | Назначение | Значения | По умолчанию | Компонент |
 |---|---|---|---|---|
 | `AUTH_MODE` | Режим аутентификации | `LOCAL` \| `SSO` (иное → fatal) | `SSO` [code] / `LOCAL` [chart] | оба |
+| `SSO_PROVIDERS` | Список активных SSO-провайдеров (через запятую). Каждый провайдер даёт кнопку на странице логина. `keycloak` настраивается через `KEYCLOAK_*`; остальные — через `OIDC_<NAME>_*` | CSV (имена в нижнем регистре) | `keycloak` | оба |
 | `APP_ENV` | Окружение приложения. В не-`development` включаются https-гейты и обязательность секретов | `development` \| `production` \| `test` | `development` [code] / `production` [chart] | оба |
 | `KEYCLOAK_URL` | Внутренний URL Keycloak (backend → KC) | URL | `http://localhost:9090` [code] / `""` [chart] | оба |
 | `KEYCLOAK_PUBLIC_URL` | Публичный URL Keycloak (редиректы браузера). Пусто → берётся `KEYCLOAK_URL` | URL | `""` | оба |
@@ -28,6 +29,26 @@
 | `GOOGLE_OAUTH_CLIENT_ID` | Google OAuth client id | строка | `""` | оба |
 | `GOOGLE_OAUTH_CLIENT_SECRET` | Google OAuth client secret | строка (секрет) | `""` | оба |
 | `GOOGLE_OAUTH_REDIRECT_URL` | Google OAuth redirect URL | URL | `http://localhost:8080/api/v1/auth/google/callback` | оба |
+
+### Generic OIDC-провайдеры (`OIDC_<NAME>_*`)
+
+Для каждого провайдера, указанного в `SSO_PROVIDERS` (кроме `keycloak`), задаётся набор переменных с префиксом `OIDC_<UPPER(NAME)>_`. Пример: провайдер `azure` → переменные `OIDC_AZURE_*`.
+
+| Переменная | Назначение | Значения | По умолчанию | Компонент |
+|---|---|---|---|---|
+| `OIDC_<NAME>_DISPLAY_NAME` | Метка кнопки входа в UI | строка | имя провайдера | оба |
+| `OIDC_<NAME>_DISCOVERY_URL` | URL OIDC well-known (`/.well-known/openid-configuration`). Обязательна, если не заданы все endpoint-overrides явно | URL | `""` | оба |
+| `OIDC_<NAME>_CLIENT_ID` | Client ID в IdP | строка | `""` | оба |
+| `OIDC_<NAME>_CLIENT_SECRET` | Client Secret | строка (секрет) | `""` | оба |
+| `OIDC_<NAME>_SCOPES` | Запрашиваемые scopes — через **пробел** | строка | `openid profile email` | оба |
+| `OIDC_<NAME>_AUTO_PROVISION` | Автосоздание пользователей в БД при первом входе (роль `viewer`). `false` — принимать только уже существующих | `true` \| `false` | `true` | оба |
+| `OIDC_<NAME>_AUTH_URL` | Переопределение authorization endpoint | URL | из discovery | оба |
+| `OIDC_<NAME>_TOKEN_URL` | Переопределение token endpoint | URL | из discovery | оба |
+| `OIDC_<NAME>_JWKS_URL` | Переопределение jwks_uri | URL | из discovery | оба |
+| `OIDC_<NAME>_ISSUER` | Переопределение issuer | URL | из discovery | оба |
+| `OIDC_<NAME>_END_SESSION_URL` | Переопределение end_session_endpoint | URL | из discovery | оба |
+
+> Разрешение endpoints: явный override > discovery document > ошибка при старте. Redirect URI, который нужно зарегистрировать в IdP: `{FRONTEND_URL}/auth/callback`.
 | `JWT_SECRET` | Секрет подписи внутренних JWT. В не-dev — **обязательная** (fatal) | строка (секрет) | `change-this-secret-key` [code] | оба |
 | `ACCESS_TOKEN_TTL_MINUTES` | TTL access-токена | целое ≥1 | `15` | оба |
 | `REFRESH_TOKEN_TTL_DAYS` | TTL refresh-токена | целое ≥1 | `7` | оба |
@@ -183,7 +204,8 @@
 
 - `JWT_SECRET` — fatal при `APP_ENV != development`.
 - `DB_PASSWORD` — fatal при `APP_ENV != development`.
-- `KEYCLOAK_CLIENT_SECRET` — fatal при `AUTH_MODE=SSO` и `APP_ENV != development`.
+- `KEYCLOAK_CLIENT_SECRET` — fatal при `AUTH_MODE=SSO` и `APP_ENV != development` (если `keycloak` в `SSO_PROVIDERS`).
+- `OIDC_<NAME>_CLIENT_ID` / `OIDC_<NAME>_CLIENT_SECRET` — обязательны для каждого провайдера в `SSO_PROVIDERS` кроме `keycloak`.
 - `LOCAL_ADMIN_PASSWORD` — de-facto обязательна для `AUTH_MODE=LOCAL` (без неё нет первого админа).
 - `DUAL_VERIFY_CALLBACK_BASE_URL` — fail-fast при `FEATURE_DUAL_VERIFY=true`.
 - В `production` https-гейты (fatal при `http://`, если заданы): `KEYCLOAK_JWKS_URL`, `KEYCLOAK_TOKEN_URL`, `KC_JWKS_URL`, `KC_ISSUER`, `DOMAINSCOPE_VERIFY_URL`.
