@@ -42,6 +42,7 @@
 | `OIDC_<NAME>_CLIENT_SECRET` | Client Secret | строка (секрет) | `""` | оба |
 | `OIDC_<NAME>_SCOPES` | Запрашиваемые scopes — через **пробел** | строка | `openid profile email` | оба |
 | `OIDC_<NAME>_AUTO_PROVISION` | Автосоздание пользователей в БД при первом входе (роль `viewer`). `false` — принимать только уже существующих | `true` \| `false` | `true` | оба |
+| `OIDC_<NAME>_TRUST_EMAIL` | Доверять email из IdP как верифицированному, даже если `email_verified` отсутствует в токене. **Обязательна для Microsoft Entra ID (Azure AD v2)** — без неё любой вход через Azure завершается 403 | `true` \| `false` | `false` | оба |
 | `OIDC_<NAME>_AUTH_URL` | Переопределение authorization endpoint | URL | из discovery | оба |
 | `OIDC_<NAME>_TOKEN_URL` | Переопределение token endpoint | URL | из discovery | оба |
 | `OIDC_<NAME>_JWKS_URL` | Переопределение jwks_uri | URL | из discovery | оба |
