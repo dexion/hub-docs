@@ -44,6 +44,7 @@ SSO_PROVIDERS=keycloak,okta      # Keycloak + Okta
 | `OIDC_<NAME>_CLIENT_SECRET` | Client Secret | Да | — |
 | `OIDC_<NAME>_SCOPES` | Запрашиваемые scopes (через пробел) | Нет | `openid profile email` |
 | `OIDC_<NAME>_AUTO_PROVISION` | Автосоздание пользователей при первом входе | Нет | `true` |
+| `OIDC_<NAME>_TRUST_EMAIL` | Доверять email из IdP как верифицированному, даже если `email_verified` отсутствует в токене. Обязательна для IdP, не эмитирующих это поле (например, Microsoft Entra ID / Azure AD v2) | Нет | `false` |
 | `OIDC_<NAME>_AUTH_URL` | Переопределение authorization endpoint | Нет | из discovery |
 | `OIDC_<NAME>_TOKEN_URL` | Переопределение token endpoint | Нет | из discovery |
 | `OIDC_<NAME>_JWKS_URL` | Переопределение jwks_uri | Нет | из discovery |
@@ -55,7 +56,8 @@ SSO_PROVIDERS=keycloak,okta      # Keycloak + Okta
 ### Идентификация пользователей
 
 - Пользователь сопоставляется по паре `(provider, subject)` (поле `sub` из JWT).
-- При первом входе нового пользователя: Hub ищет существующий аккаунт по **верифицированному email** (`email_verified=true`) и привязывает к нему; если аккаунта нет и `AUTO_PROVISION=true` — создаёт нового со статусом **active**, ролью **viewer** (расширить доступ к продуктам/проектам может администратор через UI Hub → Admin → Users).
+- При первом входе нового пользователя: Hub ищет существующий аккаунт по **верифицированному email** и привязывает к нему; если аккаунта нет и `AUTO_PROVISION=true` — создаёт нового со статусом **active**, ролью **viewer** (расширить доступ к продуктам/проектам может администратор через UI Hub → Admin → Users).
+- Hub принимает `email_verified` как булево `true` или строку `"true"`/`"1"`. Если IdP **не эмитирует** поле `email_verified` (например, Microsoft Entra ID v2) — без `OIDC_<NAME>_TRUST_EMAIL=true` вход завершится ошибкой 403. В этом случае оператор явно подтверждает, что IdP берёт на себя ответственность за верификацию email.
 - Маппинг ролей из групп IdP **не поддерживается** (роли управляются внутри Hub).
 
 ## Архитектура (один провайдер)
@@ -269,6 +271,10 @@ Azure AD — обычный OIDC-провайдер. Имя провайдера
 
 ### 2. Hub env vars
 
+> **КРИТИЧНО: `OIDC_AZURE_TRUST_EMAIL=true` обязательна для Azure / Entra ID.**
+>
+> Microsoft Entra ID (Azure AD) v2 **не включает поле `email_verified`** в токены. Hub требует верифицированный email для привязки и создания аккаунта — без `TRUST_EMAIL=true` каждый вход через Azure завершается ошибкой **403**. Выставив этот флаг, оператор подтверждает, что Entra ID гарантирует верификацию корпоративных email-адресов организации.
+
 ```ini
 AUTH_MODE=SSO
 SSO_PROVIDERS=keycloak,azure
@@ -278,6 +284,7 @@ OIDC_AZURE_DISPLAY_NAME=Azure AD
 OIDC_AZURE_DISCOVERY_URL=https://login.microsoftonline.com/<tenant-id>/v2.0/.well-known/openid-configuration
 OIDC_AZURE_CLIENT_ID=<application-client-id>
 OIDC_AZURE_CLIENT_SECRET=<client-secret-value>
+OIDC_AZURE_TRUST_EMAIL=true              # ОБЯЗАТЕЛЬНО: Entra ID не эмитирует email_verified
 # OIDC_AZURE_SCOPES=openid profile email   # по умолчанию, задавать не нужно
 # OIDC_AZURE_AUTO_PROVISION=true           # по умолчанию true
 ```
